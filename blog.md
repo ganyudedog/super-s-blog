@@ -53,10 +53,16 @@ pnpm preview      # 预览构建结果
 
 ---
 
-## 开场动画设计方案
+## 开场动画设计方案（水滴波纹主题）
 
 ### 效果描述
-下雪 → 雪花落到手臂上 → 角色出现 → 动态背景
+水滴滴下 → 泛起波纹（柏林噪声控制） → 动态壁纸从水纹中浮起显现
+
+### 素材位置
+`public/background/`
+- `WUWA 尤诺.mp4` - 动态壁纸视频
+- `preview.gif` - 预览动图
+- `project.json` - 元数据
 
 ### 技术架构
 
@@ -64,14 +70,17 @@ pnpm preview      # 预览构建结果
 ┌─────────────────────────────────────────┐
 │         Splash Animation                │
 ├─────────────────────────────────────────┤
-│  Layer 0: Shader 背景                    │
-│           (GLSL 雪景/极光/粒子效果)       │
+│  Phase 1: 水滴下落                       │
+│           (GSAP 控制 Sprite 从顶部下落)   │
 ├─────────────────────────────────────────┤
-│  Layer 1: PixiJS 粒子系统               │
-│           (雪花飘落，可与 Shader 互动)     │
+│  Phase 2: 波纹扩散                       │
+│           (DisplacementFilter + 噪声)    │
 ├─────────────────────────────────────────┤
-│  Layer 2: 角色图片                       │
-│           (GSAP 控制淡入/缩放)           │
+│  Phase 3: 壁纸浮现                       │
+│           (视频从模糊到清晰，配合波纹)     │
+├─────────────────────────────────────────┤
+│  Phase 4: 光效增强（可选）                │
+│           (Shader 添加水面反射效果)       │
 └─────────────────────────────────────────┘
 ```
 
@@ -79,31 +88,34 @@ pnpm preview      # 预览构建结果
 
 | 功能 | 技术 | 说明 |
 |------|------|------|
-| 动态背景 | PixiJS Filter + GLSL | 从 Shadertoy 移植雪景着色器 |
-| 雪花粒子 | PixiJS ParticleContainer | 高性能粒子系统 |
-| 角色出现 | gsap | 时间线控制动画序列 |
-| 交互触发 | @pixi/react | React 管理状态 |
+| 水滴动画 | PixiJS Sprite + GSAP | 控制水滴下落轨迹和动画 |
+| 波纹效果 | PixiJS DisplacementFilter | 位移贴图实现水面扭曲 |
+| 柏林噪声 | GLSL Shader | 控制波纹的随机性和自然感 |
+| 视频背景 | HTML5 `<video>` 或 PixiJS VideoTexture | 播放 MP4 素材 |
+| 光效增强 | PixiJS Filter + GLSL | 添加水面反射、光斑等效果 |
 
 ### Shader 资源获取
-- [Shadertoy](https://www.shadertoy.com/) - 搜索 `snow`、`winter`、`aurora`、`particle`
+- [ShaderGif](https://shadergif.com/) - GLSL 社区，有教程和示例（无需翻墙）
+- [Neort](https://neort.io/popular) - 数字艺术家社区（无需翻墙）
+- [Shaderoo](https://shaderoo.org/) - Shadertoy 镜像替代（无需翻墙）
+- [Smoothstep](https://smoothstep.io/) - 动画 Shader 模板（无需翻墙）
 - [shader-web-background](https://github.com/xemantic/shader-web-background) - GLSL 背景库
-- [okaybabe-shaders](https://github.com/Okay-Babe/okaybabe-shaders) - React Shader 组件
 
-### 资源清单（Shader 方案大幅减少图片需求）
+### 资源清单
 
-| 资源 | 数量 | 说明 |
+| 资源 | 位置 | 说明 |
 |------|------|------|
-| 角色静态图 | 1-2 张 | 透明背景 PNG，用于淡入出现 |
-| 角色动作帧（可选） | 若干张 | 如果需要角色动起来 |
-| Shader 代码 | 0 张图片 | 从 Shadertoy 移植或手写 |
+| 动态壁纸视频 | `public/background/WUWA 尤诺.mp4` | 主要背景素材 |
+| 水滴素材 | 需制作或生成 | 透明背景 PNG 或 SVG |
+| 柏林噪声 Shader | 手写或从社区获取 | 控制波纹效果 |
 
 ### 动画流程
 
-1. 背景渐入 (Shader 动态生成)
-2. 雪花开始飘落 (PixiJS 粒子 + Shader 粒子)
-3. 雪花累积在手臂区域 (粒子 + 碰撞检测)
-4. 角色淡入 (GSAP 动画)
-5. 角色响应鼠标/触摸 (可选交互)
+1. 水滴从顶部下落 (GSAP 动画)
+2. 水滴触碰水面，DisplacementFilter 开始扭曲
+3. 柏林噪声控制波纹扩散和随机性
+4. 视频从模糊逐渐清晰，配合波纹浮现
+5. 可选：添加水面反射、光斑等 Shader 光效
 6. 动画完成，过渡到主页面
 
 ---
@@ -111,10 +123,10 @@ pnpm preview      # 预览构建结果
 ## 待办事项
 
 - [x] 配置 `astro.config.mjs` 添加 React 集成
-- [ ] 安装 gsap 依赖
-- [ ] 创建开场动画组件（Shader + PixiJS 粒子）
-- [ ] 从 Shadertoy 移植雪花着色器
+- [x] 安装 gsap 依赖
+- [ ] 创建开场动画组件（水滴 + 波纹 + 视频背景）
+- [ ] 编写柏林噪声 GLSL Shader
+- [ ] 制作或获取水滴素材（PNG/SVG）
 - [ ] 创建 Live2D 模型展示组件（页面边缘装饰）
 - [ ] 导出 Live2D 模型并放入 `public/models/`
 - [ ] 下载 `live2dcubismcore.min.js` 放入 `public/`
-- [ ] 准备角色静态图片（1-2 张 PNG）
