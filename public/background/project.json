@@ -1,0 +1,25 @@
+{
+	"contentrating" : "Everyone",
+	"description" : "尤诺",
+	"file" : "WUWA 尤诺.mp4",
+	"general" : 
+	{
+		"properties" : 
+		{
+			"schemecolor" : 
+			{
+				"order" : 0,
+				"text" : "ui_browse_properties_scheme_color",
+				"type" : "color",
+				"value" : "0.23529 0.42353 0.61176"
+			}
+		}
+	},
+	"preview" : "preview.gif",
+	"ratingsex" : "none",
+	"ratingviolence" : "none",
+	"tags" : [ "Anime" ],
+	"title" : "WUWA 尤诺",
+	"type" : "video",
+	"version" : 0
+}
