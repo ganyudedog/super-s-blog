@@ -123,10 +123,11 @@ pnpm preview      # 预览构建结果
 ## 待办事项
 
 - [x] 配置 `astro.config.mjs` 添加 React 集成
-- [x] 安装 gsap 依赖
-- [ ] 创建开场动画组件（水滴 + 波纹 + 视频背景）
+- [x] 安装 Tailwind CSS
+- [x] 创建开场动画组件（水滴 + 波纹）
+- [ ] 安装 gsap 依赖（后续动画优化用）
 - [ ] 编写柏林噪声 GLSL Shader
-- [ ] 制作或获取水滴素材（PNG/SVG）
+- [ ] 添加视频背景浮现效果
 - [ ] 创建 Live2D 模型展示组件（页面边缘装饰）
 - [ ] 导出 Live2D 模型并放入 `public/models/`
 - [ ] 下载 `live2dcubismcore.min.js` 放入 `public/`
