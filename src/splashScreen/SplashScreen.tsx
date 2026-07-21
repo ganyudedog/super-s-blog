@@ -44,7 +44,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       />
 
       {/* 水滴 */}
-      <WaterDrop onAnimationEnd={handleDropComplete} />
+      <WaterDrop onDone={handleDropComplete} />
 
       {/* 波纹 */}
       <Ripple active={showRipple} />
