@@ -15,6 +15,7 @@
 | `react-dom` | ^19.2.7 | React DOM 渲染 |
 | `@astrojs/react` | ^6.0.1 | Astro 的 React 集成（Islands 架构） |
 | `@pixi/react` | ^8.0.5 | PixiJS 的 React 渲染器 |
+| `three` | ^0.185.1 | 开屏水面、透视、光照与水花的 WebGL 3D 渲染 |
 | `untitled-pixi-live2d-engine` | ^1.3.1 | Live2D Cubism 2-5 模型渲染支持 |
 
 ---
@@ -71,16 +72,16 @@ pnpm preview      # 预览构建结果
 │         Splash Animation                │
 ├─────────────────────────────────────────┤
 │  Phase 1: 水滴下落                       │
-│           (GSAP 控制 Sprite 从顶部下落)   │
+│           (Three.js 椭球 + 重力时间线)    │
 ├─────────────────────────────────────────┤
-│  Phase 2: 波纹扩散                       │
-│           (DisplacementFilter + 噪声)    │
+│  Phase 2: 高度纹理                       │
+│           (柏林噪声 + 径向衰减波)         │
 ├─────────────────────────────────────────┤
-│  Phase 3: 壁纸浮现                       │
-│           (视频从模糊到清晰，配合波纹)     │
+│  Phase 3: 真实水面                       │
+│           (透视平面 + 法线 + 夜间光照)     │
 ├─────────────────────────────────────────┤
-│  Phase 4: 光效增强（可选）                │
-│           (Shader 添加水面反射效果)       │
+│  Phase 4: 撞击水花                       │
+│           (InstancedMesh + 水柱 + 水环)   │
 └─────────────────────────────────────────┘
 ```
 
@@ -88,11 +89,13 @@ pnpm preview      # 预览构建结果
 
 | 功能 | 技术 | 说明 |
 |------|------|------|
-| 水滴动画 | PixiJS Sprite + GSAP | 控制水滴下落轨迹和动画 |
-| 波纹效果 | PixiJS DisplacementFilter | 位移贴图实现水面扭曲 |
-| 柏林噪声 | GLSL Shader | 控制波纹的随机性和自然感 |
-| 视频背景 | HTML5 `<video>` 或 PixiJS VideoTexture | 播放 MP4 素材 |
-| 光效增强 | PixiJS Filter + GLSL | 添加水面反射、光斑等效果 |
+| 水滴动画 | Three.js Mesh | 椭球形水滴下落并在撞击时隐藏 |
+| 波纹高度 | GLSL + WebGLRenderTarget | 第一遍渲染生成可复用高度纹理 |
+| 柏林噪声 | GLSL Shader | 控制基础水面和径向波纹的不规则性 |
+| 水面显示 | Three.js ShaderMaterial | 第二遍渲染位移平面、法线和夜间反射 |
+| 光效 | Blinn-Phong + Fresnel | 左上方真实光源驱动高光与边缘反射 |
+| 水花 | InstancedMesh | 撞击时生成水滴粒子、水柱与扩散水环 |
+| 视频背景 | HTML5 `<video>` | 后续读取高度纹理作为壁纸扭曲滤镜 |
 
 ### Shader 资源获取
 - [ShaderGif](https://shadergif.com/) - GLSL 社区，有教程和示例（无需翻墙）
@@ -106,17 +109,18 @@ pnpm preview      # 预览构建结果
 | 资源 | 位置 | 说明 |
 |------|------|------|
 | 动态壁纸视频 | `public/background/WUWA 尤诺.mp4` | 主要背景素材 |
-| 水滴素材 | 需制作或生成 | 透明背景 PNG 或 SVG |
-| 柏林噪声 Shader | 手写或从社区获取 | 控制波纹效果 |
+| 水滴素材 | 不需要 | Three.js 几何体实时渲染 |
+| 柏林噪声 Shader | `src/splashScreen/water/height.frag` | 控制水面高度和波纹 |
 
 ### 动画流程
 
-1. 水滴从顶部下落 (GSAP 动画)
-2. 水滴触碰水面，DisplacementFilter 开始扭曲
-3. 柏林噪声控制波纹扩散和随机性
-4. 视频从模糊逐渐清晰，配合波纹浮现
-5. 可选：添加水面反射、光斑等 Shader 光效
-6. 动画完成，过渡到主页面
+1. Three.js 初始化透视相机和夜晚水面
+2. Height Pass 持续生成柏林噪声高度纹理
+3. 水滴从顶部加速下落并撞击水面
+4. 撞击点向高度纹理注入径向衰减波
+5. Water Pass 读取高度纹理，计算位移、法线、反射和左上方光照
+6. 撞击同步生成水花粒子、水柱和扩散水环
+7. 后续将同一高度纹理用于动态壁纸浮现滤镜
 
 ---
 
@@ -124,9 +128,9 @@ pnpm preview      # 预览构建结果
 
 - [x] 配置 `astro.config.mjs` 添加 React 集成
 - [x] 安装 Tailwind CSS
-- [x] 创建开场动画组件（水滴 + 波纹）
-- [ ] 安装 gsap 依赖（后续动画优化用）
-- [ ] 编写柏林噪声 GLSL Shader
+- [x] 安装 Three.js 和类型依赖
+- [x] 创建 Three.js 双通道开场动画（水滴 + 水花 + 波纹）
+- [x] 编写柏林噪声高度 Shader 和夜间水面 Shader
 - [ ] 添加视频背景浮现效果
 - [ ] 创建 Live2D 模型展示组件（页面边缘装饰）
 - [ ] 导出 Live2D 模型并放入 `public/models/`
