@@ -14,5 +14,6 @@ void main() {
   if (alpha < 0.01) {
     discard;
   }
-  outColor = vec4(uColor * sprite.rgb, alpha);
+  vec3 color = mix(uColor * 0.72, vec3(0.9, 0.97, 1.0), sprite.r * 0.55);
+  outColor = vec4(color, alpha * 0.88);
 }

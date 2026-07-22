@@ -14,7 +14,7 @@ out float vAlpha;
 
 void main() {
   vec4 centerView = viewMatrix * vec4(instancePosition, 1.0);
-  centerView.xy += vec2(position.x, position.y * 1.8) * instanceScale;
+  centerView.xy += vec2(position.x, position.y * 1.12) * instanceScale;
   vUv = uv;
   vAlpha = instanceAlpha;
   gl_Position = projectionMatrix * centerView;

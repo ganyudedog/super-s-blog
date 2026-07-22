@@ -3,6 +3,7 @@ precision highp float;
 uniform vec3 uLightPosition;
 uniform float uTime;
 uniform float uAge;
+uniform float uWaterLevel;
 
 in vec3 vWorldPosition;
 in vec3 vWorldNormal;
@@ -31,10 +32,13 @@ float noise2D(vec2 p) {
 }
 
 void main() {
+  if (vWorldPosition.y < uWaterLevel) {
+    discard;
+  }
   if (vSide < 0.0) {
     discard;
   }
-  float phase = clamp(uAge / 1.08, 0.0, 1.0);
+  float phase = clamp(uAge / 1.32, 0.0, 1.0);
   float edge = smoothstep(0.58, 1.0, vRadial);
   float curlBand = smoothstep(0.42, 0.78, vRadial)
     * (1.0 - smoothstep(0.86, 1.0, vRadial));
@@ -44,7 +48,7 @@ void main() {
     + vec2(uTime * 0.42, -uTime * 0.34);
   float flowA = noise2D(flowCoordinate);
   float flowB = noise2D(flowCoordinate * 1.83 + vec2(-uTime * 0.26, uTime * 0.38));
-  float breakup = smoothstep(0.42, 0.86, phase);
+  float breakup = smoothstep(0.38, 0.82, phase);
   float breakupNoise = noise2D(circle * 4.8 + vec2(uTime * 0.52, -uTime * 0.68));
 
   float edgeFoam = edge * smoothstep(0.56, 0.72, flowA * 0.62 + flowB * 0.38);
@@ -65,6 +69,7 @@ void main() {
   );
   foamColor *= 0.78 + mask * 0.22;
 
-  float lifeFade = 1.0 - smoothstep(0.82, 1.0, phase);
-  outColor = vec4(foamColor, clamp(mask * 0.42 * lifeFade, 0.0, 0.4));
+  float appear = smoothstep(0.04, 0.2, phase);
+  float lifeFade = 1.0 - smoothstep(0.72, 0.98, phase);
+  outColor = vec4(foamColor, clamp(mask * 0.34 * appear * lifeFade, 0.0, 0.32));
 }

@@ -9,6 +9,8 @@ uniform sampler2D uHeightMap;
 uniform vec2 uHeightTexel;
 uniform float uHeightScale;
 uniform float uRippleAge;
+uniform vec2 uRippleCenter;
+uniform vec2 uWaterSize;
 
 in vec2 vUv;
 in vec3 vWorldPosition;
@@ -24,13 +26,14 @@ float decodeHeight(vec2 sampleUv) {
 
 void main() {
   // Sample the animated height map per fragment for fine wind-driven normals.
-  vec2 normalStep = uHeightTexel * 5.5;
+  vec2 normalStep = uHeightTexel * 1.25;
   float heightX = decodeHeight(vUv + vec2(normalStep.x, 0.0))
     - decodeHeight(vUv - vec2(normalStep.x, 0.0));
   float heightZ = decodeHeight(vUv + vec2(0.0, normalStep.y))
     - decodeHeight(vUv - vec2(0.0, normalStep.y));
-  vec3 normalMap = vec3(-heightX * 15.0, 0.0, -heightZ * 15.0);
+  vec3 normalMap = vec3(-heightX * 28.0, 0.0, -heightZ * 28.0);
   vec3 normal = normalize(vWorldNormal + normalMap);
+  float windSignal = texture(uHeightMap, vUv).b;
   vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
   vec3 lightDirection = normalize(uLightPosition - vWorldPosition);
   vec3 halfDirection = normalize(lightDirection + viewDirection);
@@ -39,7 +42,6 @@ void main() {
 
   float diffuse = max(dot(normal, lightDirection), 0.0);
   float specular = pow(max(dot(normal, halfDirection), 0.0), 96.0);
-  float broadSpecular = pow(max(dot(normal, halfDirection), 0.0), 18.0);
   // The dominant reflection uses a fixed horizontal normal, so wind cannot drag it around.
   vec3 stableNormal = vec3(0.0, 1.0, 0.0);
   float stableReflection = pow(max(dot(stableNormal, halfDirection), 0.0), 30.0);
@@ -53,28 +55,26 @@ void main() {
   vec3 water = mix(uDeepColor, uSurfaceColor, 0.28 + diffuse * 0.22 + depthGradient * 0.14);
   water = mix(water, nightSky, 0.18 + fresnel * 0.32);
   if (uRippleAge >= 0.0) {
-    vec2 cavityDelta = (vUv - vec2(0.5, 0.305)) * vec2(4.2, 1.7);
-    float cavityMask = exp(-pow(length(cavityDelta) / 0.105, 2.0))
+    vec2 cavityDelta = (vUv - uRippleCenter) * uWaterSize;
+    float cavityMask = exp(-pow(length(cavityDelta) / 0.62, 2.0))
       * exp(-uRippleAge * 3.2);
-    water *= 1.0 - cavityMask * 0.5;
+    water *= 1.0 - cavityMask * 0.42;
   }
   water += vec3(0.52, 0.7, 0.9) * specular * attenuation * 0.015;
-  float reflectionShimmer = 0.94 + 0.06 * sin(uTime * 0.85 + vUv.x * 18.0);
+  float reflectionShimmer = 0.94 + 0.06 * windSignal;
   water += vec3(0.22, 0.48, 0.76)
     * stableReflection * attenuation * reflectionShimmer * 0.92;
   float windGlint = pow(max(dot(normal, halfDirection), 0.0), 42.0);
   water += vec3(0.16, 0.42, 0.7) * windGlint * attenuation * 0.012;
   float windRelief = clamp(length(normalMap.xz) * 3.8, 0.0, 1.0);
-  float windSignal = texture(uHeightMap, vUv).b;
-  float windBands = 0.5 + 0.5 * sin(
-    vUv.x * 126.0 + vUv.y * 4.16 + uTime * 1.25
-  );
-  water += vec3(0.018, 0.052, 0.105) * windRelief * (0.35 + windBands * 0.65);
+  float windRibbon = smoothstep(0.52, 0.92, windSignal);
+  water += vec3(0.018, 0.052, 0.105) * windRelief * (0.28 + windRibbon * 0.72);
   water += vec3(0.009, 0.024, 0.05) * (0.3 + windSignal * 0.7);
   water += vec3(0.012, 0.032, 0.066) * smoothstep(0.12, 0.5, windRelief);
   water += vec3(0.07, 0.2, 0.36) * smoothstep(0.02, 0.28, vSlope) * 0.25;
   water += vec3(0.012, 0.03, 0.065);
-  water += vec3(0.2, 0.48, 0.78) * smoothstep(0.04, 0.62, vRippleCrest) * 0.42;
+  float rippleHighlight = smoothstep(0.05, 0.62, vRippleCrest);
+  water += vec3(0.28, 0.58, 0.86) * rippleHighlight * 0.38;
 
   float horizonFade = smoothstep(0.0, 0.14, vUv.y);
   water *= 0.78 + horizonFade * 0.22;

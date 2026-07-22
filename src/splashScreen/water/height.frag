@@ -9,8 +9,10 @@ uniform float uRippleAge;
 uniform float uRippleAge2;
 uniform float uImpactStrength;
 uniform vec2 uRippleCenter;
-uniform vec2 uRippleCenter2;
+uniform vec2 uWaterSize;
 uniform float uImpactStrength2;
+uniform vec2 uWindDirection;
+uniform float uWindSpeed;
 
 vec4 mod289(vec4 x) {
   return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -61,25 +63,108 @@ float perlin(vec2 p) {
   return 2.3 * mix(nx.x, nx.y, fadeXY.y);
 }
 
-float waterHeight(vec2 uv) {
-  // Positive phase movement makes the visible wave travel toward -X.
-  vec2 surfaceScale = vec2(4.2, 1.3);
-  vec2 flow = vec2(uTime * 0.105, -uTime * 0.018);
-  float base = perlin(uv * vec2(4.5, 6.0) * surfaceScale + flow) * 0.02;
-  base += perlin(uv * vec2(9.0, 12.0) * surfaceScale - flow * 1.7) * 0.009;
-  base += perlin(uv * vec2(19.0, 24.0) * surfaceScale + flow * 2.2) * 0.005;
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
 
-  // Directional wind bands move toward -X and deform the surface itself.
-  float windNoise = perlin(uv * vec2(8.0, 18.0) * surfaceScale + flow * 0.8);
-  float windWave = sin(uv.x * 30.0 * surfaceScale.x
-    + uv.y * 3.2 * surfaceScale.y + uTime * 1.25 + windNoise * 1.8);
+vec2 hash22(vec2 p) {
+  return vec2(
+    hash21(p + vec2(17.17, 3.11)),
+    hash21(p + vec2(7.13, 29.71))
+  );
+}
+
+float microWaveField(vec2 flowPosition, out float microSignal) {
+  vec2 gridPosition = flowPosition / 3.1;
+  vec2 baseCell = floor(gridPosition);
+  vec2 localPosition = fract(gridPosition);
+  float height = 0.0;
+  microSignal = 0.0;
+
+  for (int y = -1; y <= 1; y += 1) {
+    for (int x = -1; x <= 1; x += 1) {
+      vec2 offset = vec2(float(x), float(y));
+      vec2 cell = baseCell + offset;
+      vec2 center = offset + hash22(cell);
+      vec2 delta = localPosition - center;
+      delta = vec2(delta.x * 0.72, delta.y * 1.28);
+      float distanceToCenter = length(delta);
+      float cycleRate = mix(0.17, 0.31, hash21(cell + vec2(41.3, 9.2)));
+      float cycle = fract(uTime * cycleRate + hash21(cell + vec2(5.4, 63.1)));
+      float radius = mix(0.06, 0.78, cycle);
+      float frontDistance = distanceToCenter - radius;
+      float life = smoothstep(0.0, 0.13, cycle)
+        * (1.0 - smoothstep(0.58, 1.0, cycle));
+      float spatialFade = 1.0 - smoothstep(0.22, 1.08, distanceToCenter);
+      float ring = cos(frontDistance * 25.0)
+        * exp(-abs(frontDistance) * 8.0) * life * spatialFade;
+      height += ring;
+      microSignal += abs(ring) * 0.48;
+    }
+  }
+
+  microSignal = clamp(microSignal, 0.0, 1.0);
+  return height * 0.002;
+}
+
+vec2 impactDelta(vec2 uv) {
+  return (uv - uRippleCenter) * uWaterSize;
+}
+
+float windSurface(vec2 uv, out float windSignal) {
+  // The large-scale current keeps a clear wind direction while locally bending
+  // and grouping the smaller waves into irregular packets.
+  vec2 windDirection = normalize(uWindDirection);
+  vec2 waveAxis = -windDirection;
+  vec2 crossAxis = vec2(-waveAxis.y, waveAxis.x);
+  vec2 worldPosition = uv * uWaterSize;
+  float travel = uTime * uWindSpeed * 130.0;
+  vec2 advectedWorld = worldPosition - windDirection * travel;
+  float rawAlong = dot(advectedWorld, waveAxis);
+  float rawAcross = dot(worldPosition, crossAxis);
+
+  float broadCurrent = perlin(vec2(rawAlong * 0.018, rawAcross * 0.032) + vec2(1.7, -2.4));
+  float crossCurrent = perlin(vec2(rawAlong * 0.032 - travel * 0.012, rawAcross * 0.021) + vec2(-3.1, 0.8));
+  float shearCurrent = perlin(vec2(rawAlong * 0.066, rawAcross * 0.052) + vec2(4.2, 1.3));
+  float alongWind = rawAlong + broadCurrent * 2.8 + crossCurrent * 0.85;
+  float acrossWind = rawAcross + broadCurrent * 1.15 + shearCurrent * 0.6;
+
+  float packetNoise = perlin(vec2(
+    rawAlong * 0.043 - travel * 0.018,
+    rawAcross * 0.057 + crossCurrent * 0.7
+  ));
+  float currentSpeed = 0.86 + broadCurrent * 0.13 + crossCurrent * 0.07;
+  float longPhase = alongWind * 0.17 * currentSpeed
+    + acrossWind * (0.025 + crossCurrent * 0.018);
+  float mediumPhase = alongWind * 0.38 * (0.94 + shearCurrent * 0.08)
+    - acrossWind * 0.072 + broadCurrent * 1.1;
+  float shortPhase = alongWind * 0.79 * (0.92 + crossCurrent * 0.1)
+    + acrossWind * 0.135 + shearCurrent * 1.45;
+  float capillaryPhase = alongWind * 1.42
+    - acrossWind * 0.22 + packetNoise * 2.1;
   float windEnvelope = 0.45 + 0.55 * smoothstep(0.0, 0.9, uv.y);
-  base += windWave * 0.007 * windEnvelope;
+  float wavePacket = smoothstep(-0.72, 0.68, packetNoise);
+  float calmPatch = 0.48 + wavePacket * 0.52;
+  float longWave = sin(longPhase) * 0.0095;
+  float mediumWave = sin(mediumPhase) * 0.0046 * (0.58 + wavePacket * 0.42);
+  float shortWave = sin(shortPhase) * 0.00235 * calmPatch;
+  float capillaryWave = sin(capillaryPhase) * 0.00115 * wavePacket;
+  float microSignal = 0.0;
+  float microWaves = microWaveField(
+    vec2(alongWind, acrossWind + crossCurrent * 1.25),
+    microSignal
+  );
+  float base = (longWave + mediumWave + shortWave + capillaryWave) * windEnvelope;
+  base += microWaves * mix(0.72, 1.0, windEnvelope);
 
-  // Smaller streaks provide the normal-map detail responsible for the shimmer.
-  float windStreak = sin(uv.x * 78.0 * surfaceScale.x
-    + uv.y * 8.0 * surfaceScale.y + uTime * 2.9 + windNoise * 2.5);
-  base += windStreak * 0.0035 * (0.55 + 0.45 * smoothstep(0.0, 1.0, uv.y));
+  float slopeSignal = abs(cos(mediumPhase)) * 0.44
+    + abs(cos(shortPhase)) * 0.36
+    + abs(cos(capillaryPhase)) * 0.2;
+  windSignal = clamp(slopeSignal * calmPatch * 0.82 + microSignal * 0.58, 0.0, 1.0);
+  return base;
+}
+
+float waterHeight(vec2 uv, float base) {
 
   if (uRippleAge < 0.0 && uRippleAge2 < 0.0) {
     return base;
@@ -87,41 +172,79 @@ float waterHeight(vec2 uv) {
 
   float ripple = 0.0;
   if (uRippleAge >= 0.0) {
-    // Compensate for the plane depth and camera pitch without collapsing the ring.
-    vec2 delta = (uv - uRippleCenter) * vec2(4.2, 1.7);
+    vec2 delta = impactDelta(uv);
     float distanceToImpact = length(delta);
-    float radius = uRippleAge * 0.28;
-    float noiseWarp = perlin(uv * 8.0 + vec2(uTime * 0.08, 0.0));
-    float behindFront = radius - distanceToImpact;
-    float waveWindow = smoothstep(-0.025, 0.015, behindFront)
-      * exp(-max(behindFront, 0.0) * 5.5);
-    float rings = sin((distanceToImpact - radius) * 78.0 + noiseWarp * 3.4);
-    float leadingRing = exp(-pow((distanceToImpact - radius) * 20.0, 2.0));
-    float timeDecay = exp(-uRippleAge * 0.38);
-    // The impact pulls a visible cavity below the surface before the rim rebounds.
-    float cavity = -exp(-pow(distanceToImpact / 0.105, 2.0))
-      * exp(-uRippleAge * 3.2) * 0.3;
-    float cavityRim = exp(-pow((distanceToImpact - 0.105) * 24.0, 2.0))
-      * exp(-uRippleAge * 2.0) * 0.075;
-    float crater = -exp(-distanceToImpact * 30.0) * exp(-uRippleAge * 5.0);
+    float cavityLife = 1.0 - smoothstep(0.1, 0.34, uRippleAge);
+    float cavity = -exp(-pow(distanceToImpact / 0.62, 2.0))
+      * cavityLife * 0.15;
+    float cavityRim = exp(-pow((distanceToImpact - 0.62) * 2.1, 2.0))
+      * cavityLife * 0.046;
+    float reboundLife = smoothstep(0.16, 0.27, uRippleAge)
+      * (1.0 - smoothstep(0.4, 0.58, uRippleAge));
+    float rebound = exp(-pow(distanceToImpact / 0.5, 2.0))
+      * reboundLife * 0.105;
+    ripple += cavity + cavityRim + rebound;
 
-    ripple += cavity + cavityRim
-      + (rings * waveWindow * 0.72 + leadingRing * 0.5 + crater * 0.34)
-      * 0.13 * timeDecay * uImpactStrength;
+    // Keep the Eulerian water surface and the ballistic crown joined by the
+    // same raised meniscus. The splash vertex shader samples this exact field.
+    float crownFormation = smoothstep(0.035, 0.17, uRippleAge);
+    float crownSettle = 1.0 - smoothstep(0.64, 0.96, uRippleAge);
+    float radialTravel = 1.0 - exp(-uRippleAge * 3.15);
+    float crownDescent = smoothstep(0.48, 0.94, uRippleAge);
+    float rimRadius = 0.19 + radialTravel * 0.88
+      + max(uRippleAge - 0.34, 0.0) * 0.075;
+    float sheetWidth = mix(0.13, 0.39, radialTravel)
+      * mix(1.0, 0.62, crownDescent);
+    float angle = atan(delta.y, delta.x);
+    float rootVariation = 1.0
+      + 0.042 * sin(angle * 5.0 + 0.8)
+      + 0.022 * sin(angle * 9.0 - 0.45);
+    float rootRadius = max(0.075, rimRadius - sheetWidth) * rootVariation;
+    float meniscusWidth = mix(0.12, 0.2, radialTravel);
+    float crownMeniscus = exp(-pow(
+      (distanceToImpact - rootRadius) / meniscusWidth,
+      2.0
+    ));
+    float innerShoulder = exp(-pow(distanceToImpact / max(rootRadius, 0.16), 4.0));
+    ripple += (crownMeniscus * 0.043 + innerShoulder * 0.009)
+      * crownFormation * crownSettle;
+
+    // The impact wave starts after the cavity forms and cannot affect points ahead of its front.
+    float propagationAge = uRippleAge - 0.1;
+    if (propagationAge >= 0.0) {
+      float angle = atan(delta.y, delta.x);
+      float staticWarp = sin(angle * 5.0 + 0.7) * 0.035
+        + perlin(delta * 0.18) * 0.025;
+      float radius = propagationAge * 6.5;
+      float frontDistance = distanceToImpact + staticWarp - radius;
+      float reached = 1.0 - smoothstep(0.08, 0.55, frontDistance);
+      float distanceBehind = max(radius - distanceToImpact, 0.0);
+      float leadingRing = exp(-pow(frontDistance * 1.2, 2.0));
+      float trailingWaves = sin(distanceBehind * 3.9)
+        * exp(-distanceBehind * 0.66) * step(0.0, distanceBehind);
+      float waveLife = smoothstep(0.0, 0.12, propagationAge)
+        * exp(-propagationAge * 0.58);
+      ripple += (leadingRing * 0.064 + trailingWaves * 0.032)
+        * reached * waveLife * uImpactStrength;
+    }
   }
 
   if (uRippleAge2 >= 0.0) {
-    vec2 delta2 = (uv - uRippleCenter2) * vec2(4.2, 1.7);
-    float distanceToImpact2 = length(delta2);
-    float radius2 = uRippleAge2 * 0.28;
-    float noiseWarp2 = perlin(uv * 8.0 + vec2(uTime * 0.08, 0.0));
-    float behindFront2 = radius2 - distanceToImpact2;
-    float waveWindow2 = smoothstep(-0.025, 0.015, behindFront2)
-      * exp(-max(behindFront2, 0.0) * 5.5);
-    float rings2 = sin((distanceToImpact2 - radius2) * 78.0 + noiseWarp2 * 3.4);
-    float leadingRing2 = exp(-pow((distanceToImpact2 - radius2) * 20.0, 2.0));
-    ripple += (rings2 * waveWindow2 * 0.72 + leadingRing2 * 0.5)
-      * 0.13 * exp(-uRippleAge2 * 0.38) * uImpactStrength2;
+    vec2 delta = impactDelta(uv);
+    float distanceToImpact = length(delta);
+    float angle = atan(delta.y, delta.x);
+    float radius = 0.8 + uRippleAge2 * 6.0;
+    float frontDistance = distanceToImpact - radius;
+    float reached = 1.0 - smoothstep(0.06, 0.5, frontDistance);
+    float angularBreakup = 0.86 + 0.14 * sin(angle * 7.0 + 0.35);
+    float leadingRing = exp(-pow(frontDistance * 1.32, 2.0));
+    float distanceBehind = max(radius - distanceToImpact, 0.0);
+    float trailingWave = sin(distanceBehind * 4.15)
+      * exp(-distanceBehind * 0.9) * step(0.0, distanceBehind);
+    float waveLife = smoothstep(0.0, 0.14, uRippleAge2)
+      * exp(-uRippleAge2 * 0.95);
+    ripple += (leadingRing * 0.045 + trailingWave * 0.018)
+      * reached * angularBreakup * waveLife * uImpactStrength2;
   }
 
   return base + ripple;
@@ -134,29 +257,43 @@ float rippleCrest(vec2 uv) {
 
   float crest = 0.0;
   if (uRippleAge >= 0.0) {
-    vec2 delta = (uv - uRippleCenter) * vec2(4.2, 1.7);
+    vec2 delta = impactDelta(uv);
     float distanceToImpact = length(delta);
-    float radius = uRippleAge * 0.28;
-    float noiseWarp = perlin(uv * 8.0 + vec2(uTime * 0.08, 0.0));
-    float waveFront = exp(-pow((distanceToImpact - radius) * 20.0, 2.0));
-    float irregularity = 0.7 + 0.3 * smoothstep(-1.0, 1.0, noiseWarp);
-    crest += waveFront * exp(-uRippleAge * 0.38) * irregularity * uImpactStrength;
+    float propagationAge = uRippleAge - 0.1;
+    if (propagationAge >= 0.0) {
+      float angle = atan(delta.y, delta.x);
+      float staticWarp = sin(angle * 5.0 + 0.7) * 0.035
+        + perlin(delta * 0.18) * 0.025;
+      float radius = propagationAge * 6.5;
+      float frontDistance = distanceToImpact + staticWarp - radius;
+      float reached = 1.0 - smoothstep(0.08, 0.55, frontDistance);
+      float waveFront = exp(-pow(frontDistance * 1.2, 2.0));
+      float waveLife = smoothstep(0.0, 0.12, propagationAge)
+        * exp(-propagationAge * 0.58);
+      crest += waveFront * reached * waveLife * uImpactStrength;
+    }
   }
   if (uRippleAge2 >= 0.0) {
-    vec2 delta2 = (uv - uRippleCenter2) * vec2(4.2, 1.7);
-    float distanceToImpact2 = length(delta2);
-    float radius2 = uRippleAge2 * 0.28;
-    float waveFront2 = exp(-pow((distanceToImpact2 - radius2) * 20.0, 2.0));
-    crest += waveFront2 * exp(-uRippleAge2 * 0.38) * uImpactStrength2;
+    vec2 delta = impactDelta(uv);
+    float distanceToImpact = length(delta);
+    float angle = atan(delta.y, delta.x);
+    float radius = 0.8 + uRippleAge2 * 6.0;
+    float frontDistance = distanceToImpact - radius;
+    float reached = 1.0 - smoothstep(0.06, 0.5, frontDistance);
+    float angularBreakup = 0.86 + 0.14 * sin(angle * 7.0 + 0.35);
+    float waveFront = exp(-pow(frontDistance * 1.32, 2.0));
+    float waveLife = smoothstep(0.0, 0.14, uRippleAge2)
+      * exp(-uRippleAge2 * 0.95);
+    crest += waveFront * reached * angularBreakup
+      * waveLife * uImpactStrength2;
   }
   return min(crest, 1.0);
 }
 
 void main() {
-  float height = waterHeight(vUv);
+  float windSignal = 0.0;
+  float base = windSurface(vUv, windSignal);
+  float height = waterHeight(vUv, base);
   float crest = rippleCrest(vUv);
-  float windSignal = 0.5 + 0.5 * sin(
-    vUv.x * 126.0 + vUv.y * 4.16 + uTime * 1.25
-  );
   outColor = vec4(0.5 + height * 0.45, crest, windSignal, 1.0);
 }
