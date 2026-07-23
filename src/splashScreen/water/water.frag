@@ -11,6 +11,12 @@ uniform float uHeightScale;
 uniform float uRippleAge;
 uniform vec2 uRippleCenter;
 uniform vec2 uWaterSize;
+uniform sampler2D uVideoTexture;
+uniform float uVideoReady;
+uniform vec2 uVideoUvScale;
+uniform vec2 uVideoUvOffset;
+uniform vec2 uResolution;
+uniform float uRevealProgress;
 
 in vec2 vUv;
 in vec3 vWorldPosition;
@@ -60,6 +66,48 @@ void main() {
       * exp(-uRippleAge * 3.2);
     water *= 1.0 - cavityMask * 0.42;
   }
+
+  // The same DOM video is sampled through the water surface. This is
+  // transmission/refraction rather than a mirrored reflection pass.
+  vec2 screenUv = gl_FragCoord.xy / max(uResolution, vec2(1.0));
+  vec2 videoUv = screenUv * uVideoUvScale + uVideoUvOffset;
+  float distortionStrength = mix(0.0025, 0.009, clamp(windSignal, 0.0, 1.0));
+  vec2 videoDistortion = vec2(normalMap.x, -normalMap.z) * distortionStrength;
+  videoDistortion += vec2(
+    sin(vUv.y * 84.0 + uTime * 0.72),
+    cos(vUv.x * 76.0 - uTime * 0.54)
+  ) * 0.0014;
+  vec2 refractedUv = clamp(videoUv + videoDistortion, vec2(0.002), vec2(0.998));
+  vec2 blurDirection = normalize(vec2(0.72, 0.34) + normalMap.xz * 0.05) * 0.0018;
+  vec3 videoColor = texture(uVideoTexture, refractedUv).rgb * 0.58;
+  videoColor += texture(
+    uVideoTexture,
+    clamp(refractedUv + blurDirection, vec2(0.002), vec2(0.998))
+  ).rgb * 0.21;
+  videoColor += texture(
+    uVideoTexture,
+    clamp(refractedUv - blurDirection, vec2(0.002), vec2(0.998))
+  ).rgb * 0.21;
+  float videoLuma = dot(videoColor, vec3(0.2126, 0.7152, 0.0722));
+  vec3 desaturatedVideo = mix(vec3(videoLuma), videoColor, 0.82);
+  vec3 submergedVideo = desaturatedVideo * vec3(0.72, 0.94, 1.08);
+  float waterDepth = smoothstep(0.015, 0.28, vUv.y);
+  float irregularRange = smoothstep(
+    0.28,
+    0.76,
+    windSignal * 0.62 + clamp(vSlope, 0.0, 1.0) * 0.24
+      + 0.14 * sin(vUv.x * 31.0 + vUv.y * 17.0 + uTime * 0.22)
+  );
+  submergedVideo = mix(
+    submergedVideo,
+    mix(uDeepColor, uSurfaceColor, 0.68),
+    0.16 + waterDepth * 0.2
+  );
+  float transmission = uRevealProgress * uVideoReady
+    * mix(0.42, 0.68, irregularRange)
+    * smoothstep(0.0, 0.12, vUv.y);
+  water = mix(water, submergedVideo, transmission);
+
   water += vec3(0.52, 0.7, 0.9) * specular * attenuation * 0.015;
   float reflectionShimmer = 0.94 + 0.06 * windSignal;
   water += vec3(0.22, 0.48, 0.76)

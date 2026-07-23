@@ -1,8 +1,29 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import BackgroundVideo from '../components/home/BackgroundVideo.astro';
+import PersonalPanel from '../components/home/PersonalPanel.astro';
+import RoutePanel from '../components/home/RoutePanel.astro';
+import StatsPanel from '../components/home/StatsPanel.astro';
+import TopBar from '../components/home/TopBar.astro';
 import SplashScreen from '../splashScreen/SplashScreen';
 ---
 
-<Layout>
-	<SplashScreen client:only="react" />
+<Layout title="super's blog | code, graphics and notes">
+	<div class="home-stage" data-home-stage data-reveal-state="waiting">
+		<BackgroundVideo />
+		<SplashScreen client:only="react" />
+		<TopBar />
+
+		<main class="home-grid" data-home-content>
+			<PersonalPanel />
+			<StatsPanel />
+			<RoutePanel />
+		</main>
+	</div>
 </Layout>
+
+<script>
+	import { initHomeReveal } from '../scripts/homeReveal';
+
+	initHomeReveal();
+</script>

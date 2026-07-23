@@ -22,6 +22,7 @@ const IMPACT_Z = -2;
 const DROP_DELAY = 0.65;
 const DROP_DURATION = 1.05;
 const SECONDARY_IMPACT_DELAY = 0.78;
+const REVEAL_IMPACT_AGE = 1.18;
 const SPRAY_PARTICLE_COUNT = 72;
 const WATER_WIDTH = 420;
 const WATER_LENGTH = 520;
@@ -54,13 +55,13 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      alpha: true,
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.setClearColor(0x07182a, 1);
+    renderer.setClearColor(0x07182a, 0);
     host.appendChild(renderer.domElement);
 
     const gl = renderer.getContext();
@@ -72,7 +73,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     });
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x07182a);
+    scene.background = null;
     scene.fog = new THREE.FogExp2(0x07182a, 0.022);
 
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
@@ -144,17 +145,44 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     });
 
     const lightPosition = new THREE.Vector3();
+    const backgroundVideo = document.querySelector<HTMLVideoElement>('#background-video');
+    const fallbackVideoTexture = new THREE.DataTexture(
+      new Uint8Array([7, 24, 42, 255]),
+      1,
+      1,
+      THREE.RGBAFormat,
+    );
+    fallbackVideoTexture.needsUpdate = true;
+    fallbackVideoTexture.colorSpace = THREE.SRGBColorSpace;
+    const videoTexture = backgroundVideo
+      ? new THREE.VideoTexture(backgroundVideo)
+      : fallbackVideoTexture;
+    videoTexture.colorSpace = THREE.SRGBColorSpace;
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+    videoTexture.generateMipmaps = false;
+    const initialDeepColor = new THREE.Color(0x08244a);
+    const initialSurfaceColor = new THREE.Color(0x145284);
+    const revealedDeepColor = new THREE.Color(0x174f70);
+    const revealedSurfaceColor = new THREE.Color(0x4ba6bd);
+
     const waterUniforms = {
       uHeightMap: { value: heightTarget.texture },
       uHeightTexel: { value: new THREE.Vector2(1 / heightTargetSize, 1 / heightTargetSize) },
       uHeightScale: { value: 1.45 },
       uLightPosition: { value: lightPosition },
-      uDeepColor: { value: new THREE.Color(0x08244a) },
-      uSurfaceColor: { value: new THREE.Color(0x145284) },
+      uDeepColor: { value: initialDeepColor.clone() },
+      uSurfaceColor: { value: initialSurfaceColor.clone() },
       uTime: { value: 0 },
       uRippleAge: { value: -1 },
       uRippleCenter: { value: heightUniforms.uRippleCenter.value },
       uWaterSize: { value: heightUniforms.uWaterSize.value },
+      uVideoTexture: { value: videoTexture },
+      uVideoReady: { value: 0 },
+      uVideoUvScale: { value: new THREE.Vector2(1, 1) },
+      uVideoUvOffset: { value: new THREE.Vector2(0, 0) },
+      uResolution: { value: new THREE.Vector2(1, 1) },
+      uRevealProgress: { value: 0 },
     };
     const waterMaterial = new THREE.RawShaderMaterial({
       vertexShader: waterVertexShader,
@@ -171,6 +199,25 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     scene.add(water);
 
     const impactWorldPosition = new THREE.Vector3(0, water.position.y, IMPACT_Z);
+    const syncVideoCover = () => {
+      const viewportWidth = Math.max(host.clientWidth, 1);
+      const viewportHeight = Math.max(host.clientHeight, 1);
+      const videoWidth = backgroundVideo?.videoWidth || 1920;
+      const videoHeight = backgroundVideo?.videoHeight || 1080;
+      const scale = Math.max(viewportWidth / videoWidth, viewportHeight / videoHeight);
+      const displayWidth = videoWidth * scale;
+      const displayHeight = videoHeight * scale;
+      const left = (viewportWidth - displayWidth) * 0.54;
+      const top = (viewportHeight - displayHeight) * 0.5;
+      waterUniforms.uVideoUvScale.value.set(
+        viewportWidth / displayWidth,
+        viewportHeight / displayHeight,
+      );
+      waterUniforms.uVideoUvOffset.value.set(
+        -left / displayWidth,
+        -top / displayHeight,
+      );
+    };
     const syncWaterMetrics = () => {
       water.updateMatrixWorld(true);
       const localImpact = water.worldToLocal(impactWorldPosition.clone());
@@ -184,6 +231,8 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       );
     };
     syncWaterMetrics();
+    syncVideoCover();
+    backgroundVideo?.addEventListener('loadedmetadata', syncVideoCover);
 
     const pointLight = new THREE.PointLight(0xa9d8ff, 150, 48, 2);
     scene.add(pointLight);
@@ -821,11 +870,13 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       frontDepthTarget.setSize(renderWidth, renderHeight);
       backDepthTarget.setSize(renderWidth, renderHeight);
       splashUniforms.uResolution.value.set(renderWidth, renderHeight);
+      waterUniforms.uResolution.value.set(renderWidth, renderHeight);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       // Keep the far left and right corners on the water at ultra-wide ratios.
       water.scale.x = Math.max(1, camera.aspect / 1.6);
       syncWaterMetrics();
+      syncVideoCover();
       placeLightAtScreenOrigin();
       const projectedLight = lightPosition.clone().project(camera);
       console.info(`${LOG} resized`, {
@@ -846,6 +897,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     const startedAt = previousTime;
     let firstFrame = true;
     let dropLaunchLogged = false;
+    let revealNotified = false;
 
     const render = () => {
       animationFrame = requestAnimationFrame(render);
@@ -859,6 +911,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       splashUniforms.uTime.value = elapsed;
       foamUniforms.uTime.value = elapsed;
       waterUniforms.uRippleAge.value = heightUniforms.uRippleAge.value;
+      waterUniforms.uVideoReady.value = backgroundVideo && backgroundVideo.readyState >= 2 ? 1 : 0;
 
       if (elapsed >= DROP_DELAY && !dropLaunchLogged) {
         dropLaunchLogged = true;
@@ -896,6 +949,26 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
         foamUniforms.uAge.value = impactAge;
         frontDepthUniforms.uAge.value = impactAge;
         backDepthUniforms.uAge.value = impactAge;
+        const revealProgress = THREE.MathUtils.smoothstep(
+          impactAge,
+          REVEAL_IMPACT_AGE,
+          REVEAL_IMPACT_AGE + 1.1,
+        );
+        waterUniforms.uRevealProgress.value = revealProgress;
+        waterUniforms.uDeepColor.value.copy(initialDeepColor).lerp(revealedDeepColor, revealProgress);
+        waterUniforms.uSurfaceColor.value
+          .copy(initialSurfaceColor)
+          .lerp(revealedSurfaceColor, revealProgress);
+        if (!revealNotified && impactAge >= REVEAL_IMPACT_AGE) {
+          revealNotified = true;
+          window.dispatchEvent(new CustomEvent('water:reveal', {
+            detail: {
+              impactAge,
+              light: { x: 0, y: 0 },
+            },
+          }));
+          console.info(`${LOG} page reveal`, { impactAge });
+        }
         splashWave.visible = impactAge < 1.38;
         splashBase.visible = splashWave.visible;
         splashRim.visible = splashWave.visible;
@@ -969,7 +1042,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
         renderer.render(frontDepthScene, camera);
         renderer.setRenderTarget(backDepthTarget);
         renderer.render(backDepthScene, camera);
-        renderer.setClearColor(0x07182a, 1);
+        renderer.setClearColor(0x07182a, 0);
 
         const baseVisible = splashBase.visible;
         const rimVisible = splashRim.visible;
@@ -1018,6 +1091,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       console.info(`${LOG} disposing scene`);
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
+      backgroundVideo?.removeEventListener('loadedmetadata', syncVideoCover);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       heightTarget.dispose();
       sceneTarget.dispose();
@@ -1043,6 +1117,8 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       sprayTexture.dispose();
       glowTexture.dispose();
       environmentTexture.dispose();
+      videoTexture.dispose();
+      if (videoTexture !== fallbackVideoTexture) fallbackVideoTexture.dispose();
       (lightGlow.material as THREE.Material).dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -1053,7 +1129,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     <div
       ref={hostRef}
       aria-hidden="true"
-      style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}
+      className="water-canvas-host"
     />
   );
 }
