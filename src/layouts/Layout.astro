@@ -68,5 +68,42 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 				<slot />
 			</main>
 		</div>
+		<script>
+			import { swapFunctions } from 'astro:transitions/client';
+
+			document.addEventListener('astro:before-swap', (event) => {
+				const currentRoute = document.querySelector<HTMLElement>('.route-panel');
+				const nextRoute = event.newDocument.querySelector<HTMLElement>('.route-panel');
+				if (!currentRoute || !nextRoute) return;
+
+				event.swap = () => {
+					swapFunctions.deselectScripts(event.newDocument);
+					swapFunctions.swapRootAttributes(event.newDocument);
+					swapFunctions.swapHeadElements(event.newDocument);
+					const restoreFocus = swapFunctions.saveFocus();
+					currentRoute.replaceWith(nextRoute);
+					restoreFocus();
+				};
+			});
+
+			document.addEventListener('astro:after-swap', () => {
+				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+				const route = document.querySelector<HTMLElement>('.route-panel');
+				if (!route) return;
+
+				const animation = route.animate(
+					[
+						{ opacity: 0, transform: 'translateY(28px)' },
+						{ opacity: 1, transform: 'translateY(0)' },
+					],
+					{
+						duration: 420,
+						easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+						fill: 'both',
+					},
+				);
+				void animation.finished.then(() => animation.cancel(), () => undefined);
+			});
+		</script>
 	</body>
 </html>
