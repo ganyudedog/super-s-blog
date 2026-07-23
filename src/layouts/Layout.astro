@@ -1,19 +1,32 @@
 ---
 import '../styles/global.css';
+import { getCollection } from 'astro:content';
+import { ClientRouter } from 'astro:transitions';
+import BackgroundVideo from '../components/home/BackgroundVideo.astro';
+import PersonalPanel from '../components/home/PersonalPanel.astro';
+import StatsPanel from '../components/home/StatsPanel.astro';
+import TopBar from '../components/home/TopBar.astro';
+import { siteConfig } from '../config';
+import SplashScreen from '../splashScreen/SplashScreen';
 
 interface Props {
 	title?: string;
 	description?: string;
+	intro?: boolean;
 }
 
 const {
-	title = "super's blog",
-	description = '记录代码、图形与日常观察。',
+	title = siteConfig.title,
+	description = siteConfig.description,
+	intro = false,
 } = Astro.props;
+const posts = await getCollection('posts', ({ data }) => !data.draft);
+const tags = new Set(posts.flatMap((post) => post.data.tags));
+const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" transition:name="root" transition:animate="none">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -21,10 +34,39 @@ const {
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
-		<meta name="theme-color" content="#07182a" />
+		<meta name="theme-color" content="#050911" />
 		<title>{title}</title>
+		<ClientRouter fallback="swap" />
 	</head>
 	<body>
-		<slot />
+		<div
+			class="home-stage"
+			data-home-stage
+			data-reveal-state={intro ? 'waiting' : 'ready'}
+			data-video-reveal-state={intro ? 'waiting' : 'ready'}
+			data-route-reveal-state={intro ? 'waiting' : 'ready'}
+		>
+			<BackgroundVideo revealed={!intro} />
+			<SplashScreen
+				intro={intro}
+				client:only="react"
+				transition:persist="water-scene"
+				transition:persist-props
+			/>
+			<TopBar revealed={!intro} />
+			<main
+				class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-24 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
+				data-home-content
+			>
+				<PersonalPanel revealed={!intro} />
+				<StatsPanel
+					postCount={posts.length}
+					noteCount={noteCount}
+					tagCount={tags.size}
+					revealed={!intro}
+				/>
+				<slot />
+			</main>
+		</div>
 	</body>
 </html>

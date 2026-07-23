@@ -1,0 +1,20 @@
+---
+import Layout from './Layout.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<Layout title={`${title} | super's blog`} description={description}>
+  <section
+    class="route-panel route-page order-3 min-w-0 md:col-start-2 md:row-span-2 md:row-start-1"
+    transition:name="site-route-content"
+    transition:animate="none"
+  >
+    <slot />
+  </section>
+</Layout>

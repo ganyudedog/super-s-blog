@@ -1,23 +1,99 @@
-<header class="top-bar" data-reveal-top>
-  <a class="brand" href="/" aria-label="返回首页">
-    <span class="brand-mark" aria-hidden="true">S</span>
-    <span>
-      <strong>super's blog</strong>
-      <small>code / graphics / notes</small>
+---
+import { navItems, siteConfig } from '../../config';
+
+interface Props {
+  revealed?: boolean;
+}
+
+const { revealed = false } = Astro.props;
+const pathname = Astro.url.pathname;
+const isActive = (href: string) => href === '/index'
+  ? pathname === '/' || pathname === '/index' || pathname === '/index/'
+  : pathname.startsWith(href);
+const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hover:bg-white/10 hover:text-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-200';
+---
+
+<header
+  class:list={[
+    'top-bar fixed inset-x-3 top-3 z-30 mx-auto grid min-h-14 max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:inset-x-4 md:px-4',
+    revealed ? 'opacity-100' : 'opacity-0',
+  ]}
+  data-reveal-top
+  transition:name="site-top-bar"
+  transition:persist
+>
+  <a class="brand flex w-fit items-center gap-2.5" href="/index" aria-label="返回首页">
+    <span class="brand-mark grid size-9 place-items-center rounded-full border border-cyan-200/35 bg-slate-950/70 text-sm font-extrabold text-cyan-200" aria-hidden="true">S</span>
+    <span class="min-w-0">
+      <strong class="block text-[0.9rem] font-semibold tracking-normal">{siteConfig.title}</strong>
+      <small class="mt-0.5 block text-[0.64rem] text-slate-400">{siteConfig.subtitle}</small>
     </span>
   </a>
 
-  <nav class="primary-nav" aria-label="主导航">
-    <a class="is-active" href="/">首页</a>
-    <a href="/archive">归档</a>
-    <a href="/notes">笔记</a>
-    <a href="/about">关于</a>
+  <nav class="primary-nav flex items-center justify-center gap-1" aria-label="主导航">
+    {navItems.map((item) => (
+      <a
+        class:list={[navLinkClass, isActive(item.href) ? 'bg-white/10 text-cyan-100' : 'text-slate-300']}
+        href={item.href}
+        aria-current={isActive(item.href) ? 'page' : undefined}
+      >
+        {item.label}
+      </a>
+    ))}
   </nav>
 
-  <button class="nav-menu-button" type="button" aria-label="打开导航菜单" aria-expanded="false">
+  <button class="nav-menu-button grid size-10 place-items-center justify-self-end gap-1 rounded-md border border-white/15 bg-black/25 p-2 text-slate-200 md:hidden" type="button" aria-label="打开导航菜单" aria-expanded="false">
     <span></span>
     <span></span>
     <span></span>
   </button>
 </header>
 
+<script>
+  const normalizePath = (pathname: string) => {
+    const normalized = pathname.replace(/\/+$/, '');
+    return normalized || '/';
+  };
+
+  const updateActiveLinks = (topBar: HTMLElement) => {
+    const currentPath = normalizePath(window.location.pathname);
+    topBar.querySelectorAll<HTMLAnchorElement>('nav a').forEach((link) => {
+      const linkPath = normalizePath(new URL(link.href, window.location.href).pathname);
+      const active = linkPath === '/index'
+        ? currentPath === '/' || currentPath === '/index'
+        : currentPath === linkPath || currentPath.startsWith(`${linkPath}/`);
+
+      link.classList.toggle('bg-white/10', active);
+      link.classList.toggle('text-cyan-100', active);
+      link.classList.toggle('text-slate-300', !active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+  };
+
+  const bindTopBars = () => {
+    document.querySelectorAll<HTMLElement>('.top-bar').forEach((topBar) => {
+      updateActiveLinks(topBar);
+      if (topBar.dataset.menuBound === 'true') return;
+      topBar.dataset.menuBound = 'true';
+      const button = topBar.querySelector<HTMLButtonElement>('.nav-menu-button');
+      const closeMenu = () => {
+        topBar.classList.remove('is-menu-open');
+        button?.setAttribute('aria-expanded', 'false');
+      };
+      button?.addEventListener('click', () => {
+        const open = topBar.classList.toggle('is-menu-open');
+        button.setAttribute('aria-expanded', String(open));
+      });
+      topBar.querySelectorAll('nav a').forEach((link) => link.addEventListener('click', closeMenu));
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || !topBar.classList.contains('is-menu-open')) return;
+        closeMenu();
+        button?.focus();
+      });
+    });
+  };
+
+  document.addEventListener('astro:page-load', bindTopBars);
+  bindTopBars();
+</script>

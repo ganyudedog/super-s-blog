@@ -7,6 +7,10 @@ interface WaterRevealDetail {
 
 const HAND_ANCHOR = { x: 0.46, y: 0.22 };
 const VIDEO_POSITION = { x: 0.54, y: 0.5 };
+const VIDEO_REVEAL_DURATION = 1.15;
+const TOP_BAR_REVEAL_AT = 0.28;
+const SIDE_PANELS_REVEAL_AT = 0.5;
+const ROUTE_PANEL_REVEAL_AT = 0.72;
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -40,26 +44,34 @@ export function initHomeReveal() {
   const leftPanel = document.querySelector<HTMLElement>('[data-reveal-left]');
   const rightPanel = document.querySelector<HTMLElement>('[data-reveal-right]');
   const routePanel = document.querySelector<HTMLElement>('[data-reveal-route]');
-  const menuButton = document.querySelector<HTMLButtonElement>('.nav-menu-button');
 
   stage.inert = true;
   if (video) {
     video.muted = true;
     video.defaultMuted = true;
-    video.loop = true;
+    video.loop = false;
     video.controls = false;
     void video.play().catch(() => undefined);
     video.addEventListener('error', () => stage.classList.add('has-video-error'));
   }
 
-  menuButton?.addEventListener('click', () => {
-    const open = topBar?.classList.toggle('is-menu-open') ?? false;
-    menuButton.setAttribute('aria-expanded', String(open));
-  });
-
   let revealed = false;
+  let finished = false;
   const finishReveal = () => {
+    if (finished) return;
+    finished = true;
+    const nightBackdrop = document.querySelector<HTMLElement>('[data-water-night]');
+    if (background) {
+      gsap.set(background, { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1 });
+    }
+    if (nightBackdrop) gsap.set(nightBackdrop, { opacity: 0 });
+    if (topBar) gsap.set(topBar, { yPercent: 0, opacity: 1 });
+    if (leftPanel) gsap.set(leftPanel, { x: 0, opacity: 1, filter: 'blur(0px)' });
+    if (rightPanel) gsap.set(rightPanel, { x: 0, opacity: 1, filter: 'blur(0px)' });
+    if (routePanel) gsap.set(routePanel, { x: 0, y: 0, scale: 1, opacity: 1 });
     stage.dataset.revealState = 'ready';
+    stage.dataset.videoRevealState = 'ready';
+    stage.dataset.routeRevealState = 'ready';
     stage.inert = false;
     topBar?.classList.add('is-lit');
     leftPanel?.classList.add('is-lit');
@@ -72,6 +84,7 @@ export function initHomeReveal() {
     if (revealed) return;
     revealed = true;
     stage.dataset.revealState = 'running';
+    stage.dataset.videoRevealState = 'running';
     stage.style.setProperty('--scene-light-x', `${detail.light?.x ?? 0}%`);
     stage.style.setProperty('--scene-light-y', `${detail.light?.y ?? 0}%`);
     if (video) void video.play().catch(() => undefined);
@@ -109,7 +122,15 @@ export function initHomeReveal() {
       timeline.fromTo(
         background,
         { clipPath: 'inset(100% 0% 0% 0%)', opacity: 0.4 },
-        { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1, duration: 1.15, ease: 'power3.inOut' },
+        {
+          clipPath: 'inset(0% 0% 0% 0%)',
+          opacity: 1,
+          duration: VIDEO_REVEAL_DURATION,
+          ease: 'power3.inOut',
+          onComplete: () => {
+            stage.dataset.videoRevealState = 'ready';
+          },
+        },
         0,
       );
     }
@@ -121,7 +142,7 @@ export function initHomeReveal() {
         topBar,
         { yPercent: -110, opacity: 0 },
         { yPercent: 0, opacity: 1, duration: 0.68, ease: 'power3.out' },
-        0.08,
+        TOP_BAR_REVEAL_AT,
       );
     }
     if (leftPanel) {
@@ -129,7 +150,7 @@ export function initHomeReveal() {
         leftPanel,
         { x: -64, opacity: 0, filter: 'blur(10px)' },
         { x: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' },
-        0.28,
+        SIDE_PANELS_REVEAL_AT,
       );
     }
     if (rightPanel) {
@@ -137,16 +158,19 @@ export function initHomeReveal() {
         rightPanel,
         { x: 64, opacity: 0, filter: 'blur(10px)' },
         { x: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' },
-        0.28,
+        SIDE_PANELS_REVEAL_AT,
       );
     }
     if (routePanel) {
+      timeline.call(() => {
+        stage.dataset.routeRevealState = 'running';
+      }, [], ROUTE_PANEL_REVEAL_AT);
       timeline.fromTo(
         routePanel,
         {
           x: routeFromX,
           y: routeFromY,
-          scale: 0.88,
+          scale: 0.94,
           opacity: 0,
           transformOrigin: routeOrigin,
         },
@@ -155,12 +179,16 @@ export function initHomeReveal() {
           y: 0,
           scale: 1,
           opacity: 1,
-          duration: 0.85,
-          ease: 'back.out(1.18)',
+          duration: 0.82,
+          ease: 'power3.out',
+          onComplete: () => {
+            stage.dataset.routeRevealState = 'ready';
+          },
         },
-        0.45,
+        ROUTE_PANEL_REVEAL_AT,
       );
     }
+    window.setTimeout(finishReveal, 1800);
   };
 
   const onWaterReveal = (event: Event) => {
@@ -168,6 +196,13 @@ export function initHomeReveal() {
   };
   window.addEventListener('water:reveal', onWaterReveal, { once: true });
 
-  window.setTimeout(() => startReveal(), 6500);
-}
+  let sceneFallback = 0;
+  const armSceneFallback = () => {
+    window.clearTimeout(sceneFallback);
+    sceneFallback = window.setTimeout(() => startReveal(), 4200);
+  };
+  window.addEventListener('water:ready', armSceneFallback, { once: true });
 
+  // Keep the page usable when WebGL initialization fails before water:ready.
+  sceneFallback = window.setTimeout(() => startReveal(), 12000);
+}

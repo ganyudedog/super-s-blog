@@ -1,0 +1,19 @@
+---
+import { getCollection } from 'astro:content';
+import PostCard from '../components/blog/PostCard.astro';
+import ContentLayout from '../layouts/ContentLayout.astro';
+
+const posts = (await getCollection('posts', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
+---
+
+<ContentLayout title="归档" description="按时间浏览全部文章。">
+  <header class="mb-5 px-1 text-slate-100">
+    <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">ARCHIVE</p>
+    <h1 class="m-0 text-3xl font-semibold">文章归档</h1>
+    <p class="mt-2 text-sm text-slate-300">共 {posts.length} 篇文章，按发布时间倒序排列。</p>
+  </header>
+  <div class="grid gap-3">
+    {posts.map((post) => <PostCard post={post} />)}
+  </div>
+</ContentLayout>

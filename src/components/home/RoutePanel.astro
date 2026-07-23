@@ -1,39 +1,34 @@
-<section class="glass-panel route-panel" data-reveal-route aria-labelledby="route-title">
-  <header class="route-heading">
+---
+import type { CollectionEntry } from 'astro:content';
+import PostCard from '../blog/PostCard.astro';
+
+interface Props {
+  posts: CollectionEntry<'posts'>[];
+  revealed?: boolean;
+}
+
+const { posts, revealed = false } = Astro.props;
+---
+
+<section
+  class:list={[
+    'route-panel order-3 min-w-0 md:col-start-2 md:row-span-2 md:row-start-1',
+    revealed ? 'opacity-100' : 'opacity-0',
+  ]}
+  data-reveal-route
+  aria-labelledby="route-title"
+  transition:name="site-route-content"
+  transition:animate="none"
+>
+  <header class="mb-4 flex items-end justify-between gap-4 px-1">
     <div>
-      <p class="panel-kicker">LATEST WRITING</p>
-      <h1 id="route-title">最近更新</h1>
+      <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">LATEST WRITING</p>
+      <h1 id="route-title" class="m-0 text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">最近更新</h1>
     </div>
-    <a href="/archive">查看归档</a>
+    <a class="mb-1 rounded-md px-2 py-1 text-xs font-semibold text-cyan-200 transition hover:bg-white/10" href="/archive">查看归档</a>
   </header>
 
-  <div class="article-list">
-    <article>
-      <div class="article-meta">
-        <time datetime="2026-07-22">2026.07.22</time>
-        <span>Creative Coding</span>
-      </div>
-      <h2><a href="/posts/water-surface">从一滴水开始：构建实时水面开屏</a></h2>
-      <p>从高度纹理、风场到水冠厚度，记录这次 WebGL 水面实验中的判断与取舍。</p>
-    </article>
-
-    <article>
-      <div class="article-meta">
-        <time datetime="2026-07-18">2026.07.18</time>
-        <span>Frontend</span>
-      </div>
-      <h2><a href="/posts/astro-islands">把交互留在恰当的位置</a></h2>
-      <p>在 Astro Islands 中拆分静态内容、动画状态和需要持续运行的图形场景。</p>
-    </article>
-
-    <article>
-      <div class="article-meta">
-        <time datetime="2026-07-11">2026.07.11</time>
-        <span>Notes</span>
-      </div>
-      <h2><a href="/posts/light-and-water">光落在水面以后</a></h2>
-      <p>整理反射、折射、吸收和粗糙度之间最容易混淆的几组关系。</p>
-    </article>
+  <div class="grid gap-3">
+    {posts.map((post) => <PostCard post={post} />)}
   </div>
 </section>
-

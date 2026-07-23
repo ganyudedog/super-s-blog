@@ -1,0 +1,37 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+}
+
+const { post } = Astro.props;
+const published = post.data.published.toLocaleDateString('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const categoryClass = post.data.category === 'Frontend'
+  ? 'text-rose-200 border-rose-200/25'
+  : post.data.category === 'Notes'
+    ? 'text-amber-200 border-amber-200/25'
+    : 'text-cyan-200 border-cyan-200/25';
+---
+
+<article class="route-item article-card rounded-lg border border-white/15 p-4 md:p-5">
+  <div class="flex flex-wrap items-center gap-2 text-[0.68rem] text-slate-400">
+    <time datetime={post.data.published.toISOString()}>{published}</time>
+    <span class:list={['border-l pl-2 font-semibold', categoryClass]}>{post.data.category}</span>
+  </div>
+  <h2 class="m-0 mt-2 text-lg font-semibold leading-7 text-slate-100 md:text-xl">
+    <a class="transition hover:text-cyan-200 focus-visible:text-cyan-200 focus-visible:outline-none" href={`/posts/${post.id}`}>
+      {post.data.title}
+    </a>
+  </h2>
+  <p class="m-0 mt-2 max-w-[68ch] text-sm leading-7 text-slate-300">{post.data.description}</p>
+  {post.data.tags.length > 0 && (
+    <div class="mt-4 flex flex-wrap gap-2 text-[0.65rem] text-slate-400">
+      {post.data.tags.map((tag) => <span class="rounded-full bg-white/[0.08] px-2 py-1">{tag}</span>)}
+    </div>
+  )}
+</article>

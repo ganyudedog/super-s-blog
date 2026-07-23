@@ -1,30 +1,49 @@
-<aside class="glass-panel stats-panel" data-reveal-right aria-labelledby="stats-title">
-  <div class="panel-heading">
+---
+interface Props {
+  postCount: number;
+  noteCount: number;
+  tagCount: number;
+  revealed?: boolean;
+}
+
+const { postCount, noteCount, tagCount, revealed = false } = Astro.props;
+---
+
+<aside
+  class:list={[
+    'glass-panel stats-panel order-2 p-4 md:col-start-1 md:row-start-2 md:p-5 xl:col-start-3 xl:row-start-1',
+    revealed ? 'opacity-100' : 'opacity-0',
+  ]}
+  data-reveal-right
+  aria-labelledby="stats-title"
+  transition:name="site-stats-panel"
+  transition:persist
+>
+  <div class="flex items-start justify-between gap-3">
     <div>
-      <p class="panel-kicker">OVERVIEW</p>
-      <h2 id="stats-title">站点统计</h2>
+      <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">OVERVIEW</p>
+      <h2 id="stats-title" class="m-0 text-base font-semibold text-slate-100">站点统计</h2>
     </div>
-    <span class="live-indicator">LIVE</span>
+    <span class="rounded bg-emerald-300/15 px-1.5 py-1 text-[0.55rem] font-extrabold tracking-[0.08em] text-emerald-200">LIVE</span>
   </div>
 
-  <dl class="stats-list">
-    <div>
-      <dt>文章</dt>
-      <dd>12</dd>
+  <dl class="mt-4">
+    <div class="flex items-baseline justify-between gap-3 border-b border-white/10 py-3">
+      <dt class="text-xs text-slate-400">文章</dt>
+      <dd class="m-0 font-mono text-lg font-extrabold text-slate-100">{postCount}</dd>
     </div>
-    <div>
-      <dt>笔记</dt>
-      <dd>28</dd>
+    <div class="flex items-baseline justify-between gap-3 border-b border-white/10 py-3">
+      <dt class="text-xs text-slate-400">笔记</dt>
+      <dd class="m-0 font-mono text-lg font-extrabold text-slate-100">{noteCount}</dd>
     </div>
-    <div>
-      <dt>标签</dt>
-      <dd>16</dd>
+    <div class="flex items-baseline justify-between gap-3 py-3">
+      <dt class="text-xs text-slate-400">标签</dt>
+      <dd class="m-0 font-mono text-lg font-extrabold text-slate-100">{tagCount}</dd>
     </div>
   </dl>
 
-  <div class="stats-footer">
-    <span>持续运行</span>
-    <strong>733 days</strong>
+  <div class="mt-3 text-[0.68rem] text-slate-400">
+    <span class="block">持续运行</span>
+    <strong class="mt-1 block text-xs text-amber-200/80">733 days</strong>
   </div>
 </aside>
-

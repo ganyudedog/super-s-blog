@@ -1,31 +1,49 @@
-<aside class="glass-panel personal-panel" data-reveal-left aria-labelledby="personal-title">
-  <div class="personal-identity">
-    <div class="profile-mark" aria-hidden="true">S</div>
+---
+import { siteConfig } from '../../config';
+
+interface Props {
+  revealed?: boolean;
+}
+
+const { revealed = false } = Astro.props;
+---
+
+<aside
+  class:list={[
+    'glass-panel personal-panel order-1 p-4 md:col-start-1 md:row-start-1 md:p-5 xl:row-span-2',
+    revealed ? 'opacity-100' : 'opacity-0',
+  ]}
+  data-reveal-left
+  aria-labelledby="personal-title"
+  transition:name="site-personal-panel"
+  transition:persist
+>
+  <div class="personal-identity flex items-center gap-3">
+    <div class="profile-mark grid size-14 shrink-0 place-items-center rounded-full border border-cyan-200/35 bg-slate-950/75 text-xl font-extrabold text-cyan-100" aria-hidden="true">S</div>
     <div>
-      <p class="panel-kicker">PROFILE</p>
-      <h2 id="personal-title">Super</h2>
-      <p class="profile-role">Frontend & creative coding</p>
+      <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">PROFILE</p>
+      <h2 id="personal-title" class="m-0 text-base font-semibold text-slate-100">{siteConfig.author.name}</h2>
+      <p class="mt-1 text-xs leading-5 text-amber-200/80">{siteConfig.author.role}</p>
     </div>
   </div>
 
-  <p class="profile-copy">
-    记录代码、图形与日常观察，也保存那些值得反复推敲的实现细节。
+  <p class="my-5 text-[0.8rem] leading-7 text-slate-300">
+    {siteConfig.author.bio}
   </p>
 
-  <dl class="profile-meta">
-    <div>
-      <dt>当前关注</dt>
-      <dd>WebGL / Shader</dd>
+  <dl class="m-0 border-y border-white/10">
+    <div class="grid gap-1 border-b border-white/10 py-2.5 text-xs md:grid-cols-[1fr_auto] md:items-center">
+      <dt class="text-slate-400">当前关注</dt>
+      <dd class="m-0 font-semibold text-slate-200 md:text-right">{siteConfig.author.focus}</dd>
     </div>
-    <div>
-      <dt>所在地</dt>
-      <dd>China</dd>
+    <div class="grid gap-1 py-2.5 text-xs md:grid-cols-[1fr_auto] md:items-center">
+      <dt class="text-slate-400">所在地</dt>
+      <dd class="m-0 font-semibold text-slate-200 md:text-right">{siteConfig.author.location}</dd>
     </div>
   </dl>
 
-  <div class="profile-actions">
-    <a href="https://github.com/" rel="noreferrer">GitHub</a>
-    <a href="mailto:hello@example.com">Email</a>
+  <div class="mt-4 grid grid-cols-2 gap-2">
+    <a class="rounded-md border border-cyan-200/20 bg-cyan-100/10 px-2 py-2 text-center text-xs font-semibold text-cyan-100 transition hover:bg-cyan-100/20" href={siteConfig.author.github} rel="noreferrer">GitHub</a>
+    <a class="rounded-md border border-rose-200/20 bg-rose-100/10 px-2 py-2 text-center text-xs font-semibold text-rose-100 transition hover:bg-rose-100/20" href={`mailto:${siteConfig.author.email}`}>Email</a>
   </div>
 </aside>
-

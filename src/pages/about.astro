@@ -1,0 +1,22 @@
+---
+import { siteConfig } from '../config';
+import ContentLayout from '../layouts/ContentLayout.astro';
+---
+
+<ContentLayout title="关于" description={`关于 ${siteConfig.author.name} 与这个博客。`}>
+  <article class="route-document px-1 py-5 text-slate-200 md:px-2 md:py-7">
+    <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-rose-200/85">ABOUT</p>
+    <h1 class="m-0 text-3xl font-semibold text-slate-100">{siteConfig.author.name}</h1>
+    <p class="mt-5 max-w-[68ch] text-[0.95rem] leading-8 text-slate-300">{siteConfig.author.bio}</p>
+    <dl class="mt-7 grid gap-3 border-t border-white/10 pt-5 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-slate-400">当前关注</dt>
+        <dd class="mt-1 font-semibold text-cyan-100">{siteConfig.author.focus}</dd>
+      </div>
+      <div>
+        <dt class="text-slate-400">所在地</dt>
+        <dd class="mt-1 font-semibold text-amber-100">{siteConfig.author.location}</dd>
+      </div>
+    </dl>
+  </article>
+</ContentLayout>

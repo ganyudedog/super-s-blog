@@ -101,10 +101,10 @@ void main() {
   submergedVideo = mix(
     submergedVideo,
     mix(uDeepColor, uSurfaceColor, 0.68),
-    0.16 + waterDepth * 0.2
+    0.1 + waterDepth * 0.14
   );
   float transmission = uRevealProgress * uVideoReady
-    * mix(0.42, 0.68, irregularRange)
+    * mix(0.62, 0.84, irregularRange)
     * smoothstep(0.0, 0.12, vUv.y);
   water = mix(water, submergedVideo, transmission);
 

@@ -15,6 +15,7 @@ import sprayFragmentShader from './water/spray.frag';
 
 interface WaterSceneProps {
   onComplete?: () => void;
+  intro?: boolean;
 }
 
 const LOG = '[WaterScene]';
@@ -23,7 +24,7 @@ const DROP_DELAY = 0.65;
 const DROP_DURATION = 1.05;
 const SECONDARY_IMPACT_DELAY = 0.78;
 const REVEAL_IMPACT_AGE = 1.18;
-const SPRAY_PARTICLE_COUNT = 72;
+const SPRAY_PARTICLE_COUNT = 48;
 const WATER_WIDTH = 420;
 const WATER_LENGTH = 520;
 const LIGHT_SCREEN_NDC = new THREE.Vector3(-1, 1, 0.15);
@@ -38,7 +39,7 @@ interface SprayParticle {
   drift: number;
 }
 
-export default function WaterScene({ onComplete }: WaterSceneProps) {
+export default function WaterScene({ onComplete, intro = false }: WaterSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,12 +57,13 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
+      powerPreference: 'high-performance',
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.setClearColor(0x07182a, 0);
+    renderer.setClearColor(0x050911, 0);
     host.appendChild(renderer.domElement);
 
     const gl = renderer.getContext();
@@ -74,7 +76,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
 
     const scene = new THREE.Scene();
     scene.background = null;
-    scene.fog = new THREE.FogExp2(0x07182a, 0.022);
+    scene.fog = new THREE.FogExp2(0x050911, 0.022);
 
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
     camera.position.set(0, 5.1, 7.4);
@@ -105,7 +107,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     const heightQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), heightMaterial);
     heightScene.add(heightQuad);
 
-    const heightTargetSize = 768;
+    const heightTargetSize = window.innerWidth < 768 ? 128 : 192;
     const heightTarget = new THREE.WebGLRenderTarget(heightTargetSize, heightTargetSize, {
       type: THREE.HalfFloatType,
       format: THREE.RGBAFormat,
@@ -147,7 +149,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     const lightPosition = new THREE.Vector3();
     const backgroundVideo = document.querySelector<HTMLVideoElement>('#background-video');
     const fallbackVideoTexture = new THREE.DataTexture(
-      new Uint8Array([7, 24, 42, 255]),
+      new Uint8Array([5, 9, 17, 255]),
       1,
       1,
       THREE.RGBAFormat,
@@ -161,18 +163,18 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
     videoTexture.generateMipmaps = false;
-    const initialDeepColor = new THREE.Color(0x08244a);
-    const initialSurfaceColor = new THREE.Color(0x145284);
-    const revealedDeepColor = new THREE.Color(0x174f70);
-    const revealedSurfaceColor = new THREE.Color(0x4ba6bd);
+    const initialDeepColor = new THREE.Color(0x030711);
+    const initialSurfaceColor = new THREE.Color(0x0a1c2c);
+    const revealedDeepColor = new THREE.Color(0x071728);
+    const revealedSurfaceColor = new THREE.Color(0x17435b);
 
     const waterUniforms = {
       uHeightMap: { value: heightTarget.texture },
       uHeightTexel: { value: new THREE.Vector2(1 / heightTargetSize, 1 / heightTargetSize) },
       uHeightScale: { value: 1.45 },
       uLightPosition: { value: lightPosition },
-      uDeepColor: { value: initialDeepColor.clone() },
-      uSurfaceColor: { value: initialSurfaceColor.clone() },
+      uDeepColor: { value: (intro ? initialDeepColor : revealedDeepColor).clone() },
+      uSurfaceColor: { value: (intro ? initialSurfaceColor : revealedSurfaceColor).clone() },
       uTime: { value: 0 },
       uRippleAge: { value: -1 },
       uRippleCenter: { value: heightUniforms.uRippleCenter.value },
@@ -182,7 +184,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       uVideoUvScale: { value: new THREE.Vector2(1, 1) },
       uVideoUvOffset: { value: new THREE.Vector2(0, 0) },
       uResolution: { value: new THREE.Vector2(1, 1) },
-      uRevealProgress: { value: 0 },
+      uRevealProgress: { value: intro ? 0 : 1 },
     };
     const waterMaterial = new THREE.RawShaderMaterial({
       vertexShader: waterVertexShader,
@@ -192,13 +194,25 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       side: THREE.DoubleSide,
       fog: false,
     });
-    const waterGeometry = new THREE.PlaneGeometry(WATER_WIDTH, WATER_LENGTH, 280, 520);
+    const compactViewport = window.innerWidth < 768;
+    const waterGeometry = new THREE.PlaneGeometry(
+      WATER_WIDTH,
+      WATER_LENGTH,
+      compactViewport ? 56 : 80,
+      compactViewport ? 96 : 128,
+    );
     const water = new THREE.Mesh(waterGeometry, waterMaterial);
     water.rotation.x = -Math.PI / 2;
     water.position.set(0, -0.35, -100);
     scene.add(water);
 
     const impactWorldPosition = new THREE.Vector3(0, water.position.y, IMPACT_Z);
+    const viewportCenter = new THREE.Vector2(0, 0);
+    const impactRaycaster = new THREE.Raycaster();
+    const waterSurfacePlane = new THREE.Plane(
+      new THREE.Vector3(0, 1, 0),
+      -water.position.y,
+    );
     const syncVideoCover = () => {
       const viewportWidth = Math.max(host.clientWidth, 1);
       const viewportHeight = Math.max(host.clientHeight, 1);
@@ -361,6 +375,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     const drop = new THREE.Mesh(new THREE.LatheGeometry(dropProfile, 36), dropMaterial);
     drop.scale.setScalar(0.22);
     drop.position.set(0, 5.5, IMPACT_Z);
+    drop.visible = false;
     scene.add(drop);
 
     const splashUniforms = {
@@ -395,8 +410,8 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       side: THREE.DoubleSide,
     });
     waveMaterial.forceSinglePass = true;
-    const crownSegments = 128;
-    const crownRings = 22;
+    const crownSegments = 96;
+    const crownRings = 18;
     const crownPositions: number[] = [];
     const crownTheta: number[] = [];
     const crownRadial: number[] = [];
@@ -692,6 +707,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     });
     const frontDepthScene = new THREE.Scene();
     const backDepthScene = new THREE.Scene();
+    const depthShells: THREE.Mesh[] = [];
     const addDepthMeshes = (
       targetScene: THREE.Scene,
       material: THREE.RawShaderMaterial,
@@ -704,6 +720,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       shell.onBeforeRender = () => {
         uniforms.uRimMode.value = 0;
       };
+      depthShells.push(shell);
       targetScene.add(shell);
     };
     addDepthMeshes(frontDepthScene, frontDepthMaterial, frontDepthUniforms);
@@ -819,7 +836,6 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     }
 
     let impactTime: number | null = null;
-    let impactAnimationAge = 0;
     let impactLogged = false;
     let secondaryImpactLogged = false;
     let completionNotified = false;
@@ -840,11 +856,10 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       backDepthUniforms.uAge.value = 0;
       heightUniforms.uRippleAge.value = 0;
       heightUniforms.uRippleAge2.value = -1;
-      impactAnimationAge = 0;
       impactTime = elapsed;
       console.info(`${LOG} impact`, {
         elapsed,
-        worldPosition: [0, 0, IMPACT_Z],
+        worldPosition: impactWorldPosition.toArray(),
         rippleUv: heightUniforms.uRippleCenter.value.toArray(),
         lightPosition: lightPosition.toArray(),
         lightScreenNdc: LIGHT_SCREEN_NDC.toArray(),
@@ -862,28 +877,57 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     const resize = () => {
       const width = Math.max(host.clientWidth, 1);
       const height = Math.max(host.clientHeight, 1);
-      renderer.setSize(width, height, false);
+      const renderScale = 1;
+      const internalWidth = Math.max(1, Math.floor(width * renderScale));
+      const internalHeight = Math.max(1, Math.floor(height * renderScale));
+      renderer.setSize(internalWidth, internalHeight, false);
       const pixelRatio = renderer.getPixelRatio();
-      const renderWidth = Math.max(1, Math.floor(width * pixelRatio));
-      const renderHeight = Math.max(1, Math.floor(height * pixelRatio));
+      const renderWidth = Math.max(1, Math.floor(internalWidth * pixelRatio));
+      const renderHeight = Math.max(1, Math.floor(internalHeight * pixelRatio));
       sceneTarget.setSize(renderWidth, renderHeight);
-      frontDepthTarget.setSize(renderWidth, renderHeight);
-      backDepthTarget.setSize(renderWidth, renderHeight);
       splashUniforms.uResolution.value.set(renderWidth, renderHeight);
       waterUniforms.uResolution.value.set(renderWidth, renderHeight);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       // Keep the far left and right corners on the water at ultra-wide ratios.
       water.scale.x = Math.max(1, camera.aspect / 1.6);
+      impactRaycaster.setFromCamera(viewportCenter, camera);
+      const centeredImpact = impactRaycaster.ray.intersectPlane(
+        waterSurfacePlane,
+        new THREE.Vector3(),
+      );
+      if (centeredImpact) {
+        impactWorldPosition.copy(centeredImpact);
+        drop.position.x = centeredImpact.x;
+        drop.position.z = centeredImpact.z;
+        const centeredSplashPosition = new THREE.Vector3(
+          centeredImpact.x,
+          water.position.y + 0.04,
+          centeredImpact.z,
+        );
+        splashBase.position.copy(centeredSplashPosition);
+        splashWave.position.copy(centeredSplashPosition);
+        splashRim.position.copy(centeredSplashPosition);
+        splashLigaments.position.copy(centeredSplashPosition);
+        splashBeads.position.copy(centeredSplashPosition);
+        splashFoam.position.copy(centeredSplashPosition);
+        depthShells.forEach((shell) => shell.position.copy(centeredSplashPosition));
+      }
       syncWaterMetrics();
       syncVideoCover();
       placeLightAtScreenOrigin();
       const projectedLight = lightPosition.clone().project(camera);
+      const projectedImpact = impactWorldPosition.clone().project(camera);
+      const impactScreenX = (projectedImpact.x * 0.5 + 0.5) * width;
+      const impactScreenY = (-projectedImpact.y * 0.5 + 0.5) * height;
+      host.dataset.impactScreenX = impactScreenX.toFixed(2);
+      host.dataset.impactScreenY = impactScreenY.toFixed(2);
       console.info(`${LOG} resized`, {
         width,
         height,
         aspect: camera.aspect,
         lightNdc: projectedLight.toArray(),
+        impactScreen: [impactScreenX, impactScreenY],
         impactUv: heightUniforms.uRippleCenter.value.toArray(),
         waterSize: heightUniforms.uWaterSize.value.toArray(),
       });
@@ -893,45 +937,50 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
     resizeObserver.observe(host);
 
     let animationFrame = 0;
-    let previousTime = performance.now() / 1000;
-    const startedAt = previousTime;
+    let startedAt = performance.now() / 1000;
+    let lastRenderedAt = 0;
+    let disposed = false;
     let firstFrame = true;
     let dropLaunchLogged = false;
     let revealNotified = false;
+    let hasDecodedVideoFrame = Boolean(backgroundVideo && backgroundVideo.readyState >= 2);
 
     const render = () => {
       animationFrame = requestAnimationFrame(render);
       const now = performance.now() / 1000;
+      if (now - lastRenderedAt < 1 / 24) return;
+      lastRenderedAt = now;
       const elapsed = now - startedAt;
-      const frameDelta = Math.min(now - previousTime, 1 / 15);
-      previousTime = now;
 
       heightUniforms.uTime.value = elapsed;
       waterUniforms.uTime.value = elapsed;
       splashUniforms.uTime.value = elapsed;
       foamUniforms.uTime.value = elapsed;
       waterUniforms.uRippleAge.value = heightUniforms.uRippleAge.value;
-      waterUniforms.uVideoReady.value = backgroundVideo && backgroundVideo.readyState >= 2 ? 1 : 0;
+      if (backgroundVideo && backgroundVideo.readyState >= 2) hasDecodedVideoFrame = true;
+      waterUniforms.uVideoReady.value = hasDecodedVideoFrame ? 1 : 0;
 
-      if (elapsed >= DROP_DELAY && !dropLaunchLogged) {
+      if (intro && elapsed >= DROP_DELAY && !dropLaunchLogged) {
         dropLaunchLogged = true;
         console.info(`${LOG} drop launched`, { delay: DROP_DELAY, duration: DROP_DURATION });
       }
 
-      if (impactTime === null && elapsed >= DROP_DELAY) {
+      if (intro && impactTime === null && elapsed >= DROP_DELAY) {
         const progress = Math.min((elapsed - DROP_DELAY) / DROP_DURATION, 1);
         const eased = progress * progress;
         drop.position.y = THREE.MathUtils.lerp(5.5, 0.1, eased);
         drop.scale.setScalar(THREE.MathUtils.lerp(0.23, 0.2, progress));
         if (progress >= 1) {
           drop.visible = false;
+          renderer.setRenderTarget(sceneTarget);
+          renderer.render(scene, camera);
+          renderer.setRenderTarget(null);
           spawnSplash(elapsed);
         }
       }
 
-      if (impactTime !== null) {
-        impactAnimationAge += frameDelta;
-        const impactAge = impactAnimationAge;
+      if (intro && impactTime !== null) {
+        const impactAge = Math.max(elapsed - impactTime, 0);
         heightUniforms.uRippleAge.value = impactAge;
         waterUniforms.uRippleAge.value = impactAge;
         const secondaryAge = impactAge - SECONDARY_IMPACT_DELAY;
@@ -1005,9 +1054,9 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
               sprayScales[index] = 0;
               return;
             }
-            sprayPositions[offset] = Math.cos(angle) * radius;
+            sprayPositions[offset] = impactWorldPosition.x + Math.cos(angle) * radius;
             sprayPositions[offset + 1] = particleY;
-            sprayPositions[offset + 2] = IMPACT_Z + Math.sin(angle) * radius * 1.8;
+            sprayPositions[offset + 2] = impactWorldPosition.z + Math.sin(angle) * radius * 1.8;
             const particleFade = 1 - THREE.MathUtils.smoothstep(particleAge, 0.72, 1.16);
             sprayAlphas[index] = globalSprayAlpha
               * particleFade * (0.58 + (index % 5) * 0.08);
@@ -1036,37 +1085,6 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
 
       renderer.setRenderTarget(heightTarget);
       renderer.render(heightScene, heightCamera);
-      if (splashWave.visible) {
-        renderer.setClearColor(0x000000, 0);
-        renderer.setRenderTarget(frontDepthTarget);
-        renderer.render(frontDepthScene, camera);
-        renderer.setRenderTarget(backDepthTarget);
-        renderer.render(backDepthScene, camera);
-        renderer.setClearColor(0x07182a, 0);
-
-        const baseVisible = splashBase.visible;
-        const rimVisible = splashRim.visible;
-        const ligamentsVisible = splashLigaments.visible;
-        const beadsVisible = splashBeads.visible;
-        const foamVisible = splashFoam.visible;
-        const sprayVisible = sprayParticles.visible;
-        splashBase.visible = false;
-        splashWave.visible = false;
-        splashRim.visible = false;
-        splashLigaments.visible = false;
-        splashBeads.visible = false;
-        splashFoam.visible = false;
-        sprayParticles.visible = false;
-        renderer.setRenderTarget(sceneTarget);
-        renderer.render(scene, camera);
-        splashBase.visible = baseVisible;
-        splashWave.visible = true;
-        splashRim.visible = rimVisible;
-        splashLigaments.visible = ligamentsVisible;
-        splashBeads.visible = beadsVisible;
-        splashFoam.visible = foamVisible;
-        sprayParticles.visible = sprayVisible;
-      }
       renderer.setRenderTarget(null);
       renderer.render(scene, camera);
 
@@ -1079,7 +1097,47 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
         console.groupEnd();
       }
     };
-    render();
+    const warmupMeshes = [
+      drop,
+      splashBase,
+      splashWave,
+      splashRim,
+      splashLigaments,
+      splashBeads,
+      splashFoam,
+      sprayParticles,
+    ];
+    const warmUpAndStart = async () => {
+      warmupMeshes.forEach((mesh) => {
+        mesh.visible = true;
+      });
+      try {
+        await Promise.all([
+          renderer.compileAsync?.(heightScene, heightCamera) ?? Promise.resolve(),
+          renderer.compileAsync?.(scene, camera) ?? Promise.resolve(),
+        ]);
+        const sceneTexture = splashUniforms.uSceneTexture.value;
+        splashUniforms.uSceneTexture.value = videoTexture;
+        renderer.setRenderTarget(sceneTarget);
+        renderer.render(scene, camera);
+        splashUniforms.uSceneTexture.value = sceneTexture;
+      } catch (error) {
+        console.warn(`${LOG} shader warmup fell back to first render`, error);
+      } finally {
+        renderer.setRenderTarget(null);
+      }
+      warmupMeshes.forEach((mesh) => {
+        mesh.visible = false;
+      });
+      if (disposed) return;
+      drop.visible = intro;
+      startedAt = performance.now() / 1000;
+      lastRenderedAt = 0;
+      host.dataset.sceneReady = 'true';
+      window.dispatchEvent(new CustomEvent('water:ready'));
+      render();
+    };
+    void warmUpAndStart();
 
     const handleContextLost = (event: Event) => {
       event.preventDefault();
@@ -1089,6 +1147,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
 
     return () => {
       console.info(`${LOG} disposing scene`);
+      disposed = true;
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
       backgroundVideo?.removeEventListener('loadedmetadata', syncVideoCover);
@@ -1123,7 +1182,7 @@ export default function WaterScene({ onComplete }: WaterSceneProps) {
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [onComplete]);
+  }, [intro, onComplete]);
 
   return (
     <div
