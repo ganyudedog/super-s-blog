@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import heightVertexShader from './water/height.vert';
 import heightFragmentShader from './water/height.frag';
+import waveFragmentShader from './water/wave.frag';
 import waterVertexShader from './water/water.vert';
 import waterFragmentShader from './water/water.frag';
 import splashVertexShader from './water/splash.vert';
@@ -25,6 +26,12 @@ const DROP_DURATION = 1.05;
 const SECONDARY_IMPACT_DELAY = 0.78;
 const REVEAL_IMPACT_AGE = 1.18;
 const SPRAY_PARTICLE_COUNT = 48;
+const POINTER_RIPPLE_COUNT = 12;
+const POINTER_SPRAY_COUNT = 18;
+const POINTER_RIPPLE_INTERVAL = 0.065;
+const POINTER_RIPPLE_MIN_DISTANCE = 12;
+const POINTER_STROKE_RESET_DELAY = 0.18;
+const POINTER_SEGMENT_MAX_LENGTH = 5;
 const WATER_WIDTH = 420;
 const WATER_LENGTH = 520;
 const LIGHT_SCREEN_NDC = new THREE.Vector3(-1, 1, 0.15);
@@ -37,6 +44,14 @@ interface SprayParticle {
   radialSpeed: number;
   verticalSpeed: number;
   drift: number;
+}
+
+interface PointerSprayParticle {
+  origin: THREE.Vector3;
+  velocity: THREE.Vector3;
+  bornAt: number;
+  lifetime: number;
+  size: number;
 }
 
 export default function WaterScene({ onComplete, intro = false }: WaterSceneProps) {
@@ -92,6 +107,25 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uImpactStrength2: { value: 0.62 },
       uWindDirection: { value: WIND_DIRECTION.clone() },
       uWindSpeed: { value: 0.009 },
+      uPointerRipples: {
+        value: Array.from(
+          { length: POINTER_RIPPLE_COUNT },
+          () => new THREE.Vector4(0.5, 0.5, -100, 0),
+        ),
+      },
+      uPointerDirections: {
+        value: Array.from(
+          { length: POINTER_RIPPLE_COUNT },
+          () => new THREE.Vector2(1, 0),
+        ),
+      },
+      uPointerPrevious: {
+        value: Array.from(
+          { length: POINTER_RIPPLE_COUNT },
+          () => new THREE.Vector2(0.5, 0.5),
+        ),
+      },
+      uWaveState: { value: null as THREE.Texture | null },
     };
 
     const heightMaterial = new THREE.RawShaderMaterial({
@@ -117,6 +151,60 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       stencilBuffer: false,
     });
     heightTarget.texture.name = 'splash-ripple-height';
+    const waveTargetSize = window.innerWidth < 768 ? 256 : 384;
+    const createWaveStateTarget = (name: string) => {
+      const target = new THREE.WebGLRenderTarget(waveTargetSize, waveTargetSize, {
+        type: THREE.HalfFloatType,
+        format: THREE.RGBAFormat,
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        depthBuffer: false,
+        stencilBuffer: false,
+      });
+      target.texture.name = name;
+      return target;
+    };
+    let waveReadTarget = createWaveStateTarget('water-wave-state-a');
+    let waveWriteTarget = createWaveStateTarget('water-wave-state-b');
+    const waveUniforms = {
+      uPreviousState: { value: waveReadTarget.texture },
+      uTexel: { value: new THREE.Vector2(1 / waveTargetSize, 1 / waveTargetSize) },
+      uWaterSize: { value: heightUniforms.uWaterSize.value },
+      uTime: { value: 0 },
+      uDeltaTime: { value: 1 / 60 },
+      uWaveStiffness: { value: 18 },
+      uDamping: { value: 2.35 },
+      uPointerImpulses: { value: heightUniforms.uPointerRipples.value },
+      uPointerPrevious: { value: heightUniforms.uPointerPrevious.value },
+      uImpactCenter: { value: heightUniforms.uRippleCenter.value },
+      uImpactStart: { value: -100 },
+      uImpactStrength: { value: 1 },
+    };
+    const waveSimulationMaterial = new THREE.RawShaderMaterial({
+      vertexShader: heightVertexShader,
+      fragmentShader: waveFragmentShader,
+      uniforms: waveUniforms,
+      glslVersion: THREE.GLSL3,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const waveSimulationScene = new THREE.Scene();
+    const waveSimulationCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const waveSimulationQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      waveSimulationMaterial,
+    );
+    waveSimulationScene.add(waveSimulationQuad);
+    heightUniforms.uWaveState.value = waveReadTarget.texture;
+    const initialClearColor = renderer.getClearColor(new THREE.Color()).clone();
+    const initialClearAlpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(waveReadTarget);
+    renderer.clear();
+    renderer.setRenderTarget(waveWriteTarget);
+    renderer.clear();
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(initialClearColor, initialClearAlpha);
     const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
       type: THREE.UnsignedByteType,
       format: THREE.RGBAFormat,
@@ -167,7 +255,6 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     const initialSurfaceColor = new THREE.Color(0x0a1c2c);
     const revealedDeepColor = new THREE.Color(0x071728);
     const revealedSurfaceColor = new THREE.Color(0x17435b);
-
     const waterUniforms = {
       uHeightMap: { value: heightTarget.texture },
       uHeightTexel: { value: new THREE.Vector2(1 / heightTargetSize, 1 / heightTargetSize) },
@@ -179,6 +266,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uRippleAge: { value: -1 },
       uRippleCenter: { value: heightUniforms.uRippleCenter.value },
       uWaterSize: { value: heightUniforms.uWaterSize.value },
+      uWaveState: { value: waveReadTarget.texture },
+      uWaveTexel: { value: new THREE.Vector2(1 / waveTargetSize, 1 / waveTargetSize) },
       uVideoTexture: { value: videoTexture },
       uVideoReady: { value: 0 },
       uVideoUvScale: { value: new THREE.Vector2(1, 1) },
@@ -823,6 +912,101 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     sprayParticles.visible = false;
     scene.add(sprayParticles);
 
+    const pointerSprayPositions = new Float32Array(POINTER_SPRAY_COUNT * 3);
+    const pointerSprayAlphas = new Float32Array(POINTER_SPRAY_COUNT);
+    const pointerSprayScales = new Float32Array(POINTER_SPRAY_COUNT);
+    const pointerSprayGeometry = new THREE.InstancedBufferGeometry();
+    pointerSprayGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      -0.5, -0.5, 0,
+      0.5, -0.5, 0,
+      0.5, 0.5, 0,
+      -0.5, 0.5, 0,
+    ], 3));
+    pointerSprayGeometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+      0, 0,
+      1, 0,
+      1, 1,
+      0, 1,
+    ], 2));
+    pointerSprayGeometry.setIndex([0, 1, 2, 0, 2, 3]);
+    const pointerSprayPositionAttribute = new THREE.InstancedBufferAttribute(
+      pointerSprayPositions,
+      3,
+    );
+    const pointerSprayAlphaAttribute = new THREE.InstancedBufferAttribute(
+      pointerSprayAlphas,
+      1,
+    );
+    const pointerSprayScaleAttribute = new THREE.InstancedBufferAttribute(
+      pointerSprayScales,
+      1,
+    );
+    pointerSprayPositionAttribute.setUsage(THREE.DynamicDrawUsage);
+    pointerSprayAlphaAttribute.setUsage(THREE.DynamicDrawUsage);
+    pointerSprayScaleAttribute.setUsage(THREE.DynamicDrawUsage);
+    pointerSprayGeometry.setAttribute('instancePosition', pointerSprayPositionAttribute);
+    pointerSprayGeometry.setAttribute('instanceAlpha', pointerSprayAlphaAttribute);
+    pointerSprayGeometry.setAttribute('instanceScale', pointerSprayScaleAttribute);
+    pointerSprayGeometry.instanceCount = POINTER_SPRAY_COUNT;
+    const pointerSprayMaterial = new THREE.RawShaderMaterial({
+      vertexShader: sprayVertexShader,
+      fragmentShader: sprayFragmentShader,
+      uniforms: {
+        uMap: { value: sprayTexture },
+        uColor: { value: new THREE.Color(0xf4fbff) },
+      },
+      glslVersion: THREE.GLSL3,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+    });
+    const pointerSpray = new THREE.Mesh(pointerSprayGeometry, pointerSprayMaterial);
+    pointerSpray.frustumCulled = false;
+    pointerSpray.renderOrder = 13;
+    scene.add(pointerSpray);
+
+    const pointerSprayStates: PointerSprayParticle[] = Array.from(
+      { length: POINTER_SPRAY_COUNT },
+      () => ({
+        origin: new THREE.Vector3(0, -100, 0),
+        velocity: new THREE.Vector3(),
+        bornAt: -100,
+        lifetime: 0,
+        size: 0,
+      }),
+    );
+    let pointerSprayIndex = 0;
+    const pointerSpraySide = new THREE.Vector3();
+    const spawnPointerSpray = (
+      worldPosition: THREE.Vector3,
+      travelDirection: THREE.Vector3,
+      strength: number,
+      elapsed: number,
+    ) => {
+      if (strength < 0.72) return;
+      const particleCount = strength > 1.05 ? 2 : 1;
+      pointerSpraySide.set(-travelDirection.z, 0, travelDirection.x).normalize();
+      for (let offsetIndex = 0; offsetIndex < particleCount; offsetIndex += 1) {
+        const particle = pointerSprayStates[pointerSprayIndex];
+        const sideSign = ((pointerSprayIndex + offsetIndex) % 2) * 2 - 1;
+        const variation = (pointerSprayIndex % 5) / 4;
+        particle.origin.copy(worldPosition);
+        particle.origin.y = water.position.y + 0.045;
+        particle.origin.addScaledVector(pointerSpraySide, sideSign * (0.025 + variation * 0.018));
+        particle.velocity.copy(travelDirection).multiplyScalar(0.055 + strength * 0.035);
+        particle.velocity.addScaledVector(
+          pointerSpraySide,
+          sideSign * (0.075 + variation * 0.045) * strength,
+        );
+        particle.velocity.y = 0.25 + variation * 0.12 + strength * 0.08;
+        particle.bornAt = elapsed;
+        particle.lifetime = 0.26 + variation * 0.1;
+        particle.size = 0.016 + variation * 0.008 + strength * 0.005;
+        pointerSprayIndex = (pointerSprayIndex + 1) % POINTER_SPRAY_COUNT;
+      }
+    };
+
     const sprayStates: SprayParticle[] = [];
     for (let index = 0; index < SPRAY_PARTICLE_COUNT; index += 1) {
       const sequence = (index * 0.61803398875) % 1;
@@ -856,6 +1040,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       backDepthUniforms.uAge.value = 0;
       heightUniforms.uRippleAge.value = 0;
       heightUniforms.uRippleAge2.value = -1;
+      waveUniforms.uImpactStart.value = elapsed;
       impactTime = elapsed;
       console.info(`${LOG} impact`, {
         elapsed,
@@ -944,6 +1129,130 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     let dropLaunchLogged = false;
     let revealNotified = false;
     let hasDecodedVideoFrame = Boolean(backgroundVideo && backgroundVideo.readyState >= 2);
+    let pointerRippleIndex = 0;
+    let lastPointerRippleAt = -Infinity;
+    let lastPointerX = Number.NaN;
+    let lastPointerY = Number.NaN;
+    let lastRippleU = Number.NaN;
+    let lastRippleV = Number.NaN;
+    const pointerNdc = new THREE.Vector2();
+    const pointerWorldPosition = new THREE.Vector3();
+    const pointerLocalPosition = new THREE.Vector3();
+    const lastPointerWorldPosition = new THREE.Vector3();
+    const pointerTravelDirection = new THREE.Vector3();
+    let hasPointerWorldPosition = false;
+    const pointerRaycaster = new THREE.Raycaster();
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch' || host.dataset.sceneReady !== 'true') return;
+      if (intro && !revealNotified) return;
+
+      const now = performance.now() / 1000;
+      if (now - lastPointerRippleAt < POINTER_RIPPLE_INTERVAL) return;
+      if (
+        Number.isFinite(lastPointerX)
+        && Math.hypot(event.clientX - lastPointerX, event.clientY - lastPointerY)
+          < POINTER_RIPPLE_MIN_DISTANCE
+      ) return;
+
+      const bounds = host.getBoundingClientRect();
+      if (
+        event.clientX < bounds.left
+        || event.clientX > bounds.right
+        || event.clientY < bounds.top
+        || event.clientY > bounds.bottom
+      ) return;
+
+      pointerNdc.set(
+        ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * 2 - 1,
+        -((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * 2 + 1,
+      );
+      pointerRaycaster.setFromCamera(pointerNdc, camera);
+      const intersection = pointerRaycaster.ray.intersectPlane(
+        waterSurfacePlane,
+        pointerWorldPosition,
+      );
+      if (!intersection) return;
+
+      pointerLocalPosition.copy(intersection);
+      water.worldToLocal(pointerLocalPosition);
+      const rippleU = pointerLocalPosition.x / WATER_WIDTH + 0.5;
+      const rippleV = pointerLocalPosition.y / WATER_LENGTH + 0.5;
+      if (rippleU < 0 || rippleU > 1 || rippleV < 0 || rippleV > 1) return;
+
+      if (
+        !Number.isFinite(lastRippleU)
+        || !Number.isFinite(lastRippleV)
+        || now - lastPointerRippleAt > POINTER_STROKE_RESET_DELAY
+      ) {
+        lastPointerRippleAt = now;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+        lastRippleU = rippleU;
+        lastRippleV = rippleV;
+        lastPointerWorldPosition.copy(intersection);
+        hasPointerWorldPosition = true;
+        return;
+      }
+
+      const waterSize = heightUniforms.uWaterSize.value;
+      const direction = heightUniforms.uPointerDirections.value[pointerRippleIndex];
+      direction.set(
+        (rippleU - lastRippleU) * waterSize.x,
+        (rippleV - lastRippleV) * waterSize.y,
+      );
+      if (direction.lengthSq() < 0.0001) return;
+      direction.normalize();
+      const screenDistance = Math.hypot(
+        event.clientX - lastPointerX,
+        event.clientY - lastPointerY,
+      );
+      const pointerSpeed = screenDistance / Math.max(now - lastPointerRippleAt, 0.016);
+      const strength = THREE.MathUtils.clamp(pointerSpeed / 850, 0.55, 1.15);
+      if (hasPointerWorldPosition) {
+        pointerTravelDirection.copy(intersection).sub(lastPointerWorldPosition);
+        pointerTravelDirection.y = 0;
+        if (pointerTravelDirection.lengthSq() > 0.0001) {
+          pointerTravelDirection.normalize();
+          // The dedicated PointerWaterLayer already renders the continuous
+          // pointer wake. Do not add a second billboard spray here: its
+          // discrete particles create bright spots on top of the smooth wake.
+        }
+      }
+
+      heightUniforms.uPointerRipples.value[pointerRippleIndex].set(
+        rippleU,
+        rippleV,
+        now - startedAt,
+        strength,
+      );
+      const segmentDeltaU = rippleU - lastRippleU;
+      const segmentDeltaV = rippleV - lastRippleV;
+      const segmentLength = Math.hypot(
+        segmentDeltaU * waterSize.x,
+        segmentDeltaV * waterSize.y,
+      );
+      const segmentScale = Math.min(
+        1,
+        POINTER_SEGMENT_MAX_LENGTH / Math.max(segmentLength, 0.0001),
+      );
+      heightUniforms.uPointerPrevious.value[pointerRippleIndex].set(
+        rippleU - segmentDeltaU * segmentScale,
+        rippleV - segmentDeltaV * segmentScale,
+      );
+      pointerRippleIndex = (pointerRippleIndex + 1) % POINTER_RIPPLE_COUNT;
+      lastPointerRippleAt = now;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      lastRippleU = rippleU;
+      lastRippleV = rippleV;
+      lastPointerWorldPosition.copy(intersection);
+      hasPointerWorldPosition = true;
+    };
+
+    const WAVE_STEP = 1 / 60;
+    let waveAccumulator = 0;
+    let waveLastElapsed = 0;
 
     const render = () => {
       animationFrame = requestAnimationFrame(render);
@@ -959,6 +1268,36 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       waterUniforms.uRippleAge.value = heightUniforms.uRippleAge.value;
       if (backgroundVideo && backgroundVideo.readyState >= 2) hasDecodedVideoFrame = true;
       waterUniforms.uVideoReady.value = hasDecodedVideoFrame ? 1 : 0;
+
+      pointerSprayStates.forEach((particle, index) => {
+        const age = elapsed - particle.bornAt;
+        const positionOffset = index * 3;
+        if (age < 0 || age >= particle.lifetime) {
+          pointerSprayPositions[positionOffset] = 0;
+          pointerSprayPositions[positionOffset + 1] = -100;
+          pointerSprayPositions[positionOffset + 2] = 0;
+          pointerSprayAlphas[index] = 0;
+          pointerSprayScales[index] = 0;
+          return;
+        }
+
+        pointerSprayPositions[positionOffset] = particle.origin.x + particle.velocity.x * age;
+        pointerSprayPositions[positionOffset + 1] = particle.origin.y
+          + particle.velocity.y * age - 0.5 * 4.8 * age * age;
+        pointerSprayPositions[positionOffset + 2] = particle.origin.z + particle.velocity.z * age;
+        const fadeIn = THREE.MathUtils.smoothstep(age, 0, 0.06);
+        const fadeOut = 1 - THREE.MathUtils.smoothstep(
+          age,
+          particle.lifetime * 0.62,
+          particle.lifetime,
+        );
+        pointerSprayAlphas[index] = fadeIn * fadeOut * 0.42;
+        pointerSprayScales[index] = particle.size
+          * THREE.MathUtils.lerp(0.72, 1, Math.min(age * 8, 1));
+      });
+      pointerSprayPositionAttribute.needsUpdate = true;
+      pointerSprayAlphaAttribute.needsUpdate = true;
+      pointerSprayScaleAttribute.needsUpdate = true;
 
       if (intro && elapsed >= DROP_DELAY && !dropLaunchLogged) {
         dropLaunchLogged = true;
@@ -1083,6 +1422,25 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
         }
       }
 
+      const waveFrameDelta = Math.min(Math.max(elapsed - waveLastElapsed, 0), 0.06);
+      waveLastElapsed = elapsed;
+      waveAccumulator = Math.min(waveAccumulator + waveFrameDelta, WAVE_STEP * 3);
+      let waveSteps = 0;
+      while (waveAccumulator >= WAVE_STEP && waveSteps < 3) {
+        waveUniforms.uPreviousState.value = waveReadTarget.texture;
+        waveUniforms.uTime.value = elapsed - waveAccumulator + WAVE_STEP;
+        waveUniforms.uDeltaTime.value = WAVE_STEP;
+        renderer.setRenderTarget(waveWriteTarget);
+        renderer.render(waveSimulationScene, waveSimulationCamera);
+        const previousReadTarget = waveReadTarget;
+        waveReadTarget = waveWriteTarget;
+        waveWriteTarget = previousReadTarget;
+        waveAccumulator -= WAVE_STEP;
+        waveSteps += 1;
+      }
+      heightUniforms.uWaveState.value = waveReadTarget.texture;
+      waterUniforms.uWaveState.value = waveReadTarget.texture;
+
       renderer.setRenderTarget(heightTarget);
       renderer.render(heightScene, heightCamera);
       renderer.setRenderTarget(null);
@@ -1113,6 +1471,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       });
       try {
         await Promise.all([
+          renderer.compileAsync?.(waveSimulationScene, waveSimulationCamera)
+            ?? Promise.resolve(),
           renderer.compileAsync?.(heightScene, heightCamera) ?? Promise.resolve(),
           renderer.compileAsync?.(scene, camera) ?? Promise.resolve(),
         ]);
@@ -1133,6 +1493,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       drop.visible = intro;
       startedAt = performance.now() / 1000;
       lastRenderedAt = 0;
+      waveAccumulator = 0;
+      waveLastElapsed = 0;
       host.dataset.sceneReady = 'true';
       window.dispatchEvent(new CustomEvent('water:ready'));
       render();
@@ -1153,11 +1515,15 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       backgroundVideo?.removeEventListener('loadedmetadata', syncVideoCover);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       heightTarget.dispose();
+      waveReadTarget.dispose();
+      waveWriteTarget.dispose();
       sceneTarget.dispose();
       frontDepthTarget.dispose();
       backDepthTarget.dispose();
       heightMaterial.dispose();
       heightQuad.geometry.dispose();
+      waveSimulationMaterial.dispose();
+      waveSimulationQuad.geometry.dispose();
       waterGeometry.dispose();
       waterMaterial.dispose();
       drop.geometry.dispose();
@@ -1173,6 +1539,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       backDepthMaterial.dispose();
       sprayGeometry.dispose();
       sprayMaterial.dispose();
+      pointerSprayGeometry.dispose();
+      pointerSprayMaterial.dispose();
       sprayTexture.dispose();
       glowTexture.dispose();
       environmentTexture.dispose();

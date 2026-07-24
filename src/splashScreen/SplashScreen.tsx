@@ -1,4 +1,5 @@
 import WaterScene from './WaterScene';
+import PointerWaterLayer from './PointerWaterLayer';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -14,6 +15,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
         style={{ opacity: intro ? 1 : 0 }}
       />
       <WaterScene intro={intro} onComplete={onComplete} />
+      <PointerWaterLayer />
     </div>
   );
 }

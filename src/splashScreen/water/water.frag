@@ -23,6 +23,7 @@ in vec3 vWorldPosition;
 in vec3 vWorldNormal;
 in float vSlope;
 in float vRippleCrest;
+in float vPointerFoam;
 
 out vec4 outColor;
 

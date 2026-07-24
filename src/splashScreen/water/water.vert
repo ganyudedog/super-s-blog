@@ -15,6 +15,7 @@ out vec3 vWorldPosition;
 out vec3 vWorldNormal;
 out float vSlope;
 out float vRippleCrest;
+out float vPointerFoam;
 
 float decodeHeight(vec2 sampleUv) {
   return (texture(uHeightMap, sampleUv).r - 0.5) / 0.45 * uHeightScale;
@@ -45,7 +46,9 @@ void main() {
     heightRight - heightLeft,
     heightUp - heightDown
   )) * 42.0, 0.0, 1.0);
-  vRippleCrest = texture(uHeightMap, uv).g;
+  vec4 heightSample = texture(uHeightMap, uv);
+  vRippleCrest = heightSample.g;
+  vPointerFoam = heightSample.a;
 
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
 }

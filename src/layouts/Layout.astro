@@ -75,6 +75,7 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 				const currentRoute = document.querySelector<HTMLElement>('.route-panel');
 				const nextRoute = event.newDocument.querySelector<HTMLElement>('.route-panel');
 				if (!currentRoute || !nextRoute) return;
+				event.viewTransition.skipTransition();
 
 				event.swap = () => {
 					swapFunctions.deselectScripts(event.newDocument);

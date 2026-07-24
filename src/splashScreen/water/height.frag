@@ -13,6 +13,10 @@ uniform vec2 uWaterSize;
 uniform float uImpactStrength2;
 uniform vec2 uWindDirection;
 uniform float uWindSpeed;
+uniform sampler2D uWaveState;
+const int POINTER_RIPPLE_COUNT = 12;
+uniform vec4 uPointerRipples[POINTER_RIPPLE_COUNT];
+uniform vec2 uPointerDirections[POINTER_RIPPLE_COUNT];
 
 vec4 mod289(vec4 x) {
   return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -111,6 +115,54 @@ vec2 impactDelta(vec2 uv) {
   return (uv - uRippleCenter) * uWaterSize;
 }
 
+float pointerWakeField(vec2 uv, out float foam) {
+  float height = 0.0;
+  foam = 0.0;
+
+  for (int index = 0; index < POINTER_RIPPLE_COUNT; index += 1) {
+    vec4 ripple = uPointerRipples[index];
+    float age = uTime - ripple.z;
+    if (age < 0.0 || age > 0.96 || ripple.w <= 0.0) continue;
+
+    vec2 delta = (uv - ripple.xy) * uWaterSize;
+    vec2 direction = normalize(uPointerDirections[index]);
+    vec2 sideDirection = vec2(-direction.y, direction.x);
+    float along = dot(delta, direction);
+    float across = dot(delta, sideDirection);
+    float wakeLength = mix(2.6, 3.8, clamp(ripple.w, 0.0, 1.0));
+    float trailEnvelope = smoothstep(-wakeLength - 0.72, -wakeLength, along)
+      * (1.0 - smoothstep(0.18, 0.62, along));
+    float fadeIn = smoothstep(0.0, 0.045, age);
+    float grooveLife = fadeIn * (1.0 - smoothstep(0.5, 0.9, age)) * ripple.w;
+    float backflowLife = smoothstep(0.3, 0.5, age)
+      * (1.0 - smoothstep(0.72, 0.96, age)) * ripple.w;
+    float grooveWidth = mix(1.12, 1.46, clamp(ripple.w, 0.0, 1.0));
+    float groove = exp(-pow(across / grooveWidth, 2.0)) * trailEnvelope;
+    float ridgeOffset = grooveWidth * 1.18;
+    float sideRidges = exp(-pow((abs(across) - ridgeOffset) / 0.62, 2.0))
+      * trailEnvelope;
+    float bowWave = exp(-pow((along - 0.42) / 0.68, 2.0))
+      * exp(-pow(across / 1.85, 2.0));
+    float backflowProgress = smoothstep(0.3, 0.82, age);
+    float returnOffset = mix(ridgeOffset, 0.18, backflowProgress);
+    float returnWave = exp(-pow((abs(across) - returnOffset) / 0.58, 2.0))
+      * trailEnvelope;
+    float breakup = 0.72 + 0.28 * sin(
+      along * 3.7 + across * 4.1 + float(index) * 2.17
+    );
+
+    height += (-groove * 0.052 + sideRidges * 0.027 + bowWave * 0.034)
+      * grooveLife;
+    height += returnWave * 0.034 * backflowLife;
+    foam = max(
+      foam,
+      (sideRidges * 0.12 + bowWave * 0.18) * breakup * grooveLife
+    );
+  }
+
+  return clamp(height, -0.085, 0.072);
+}
+
 float windSurface(vec2 uv, out float windSignal) {
   // The large-scale current keeps a clear wind direction while locally bending
   // and grouping the smaller waves into irregular packets.
@@ -164,10 +216,10 @@ float windSurface(vec2 uv, out float windSignal) {
   return base;
 }
 
-float waterHeight(vec2 uv, float base) {
+float waterHeight(vec2 uv, float base, float pointerHeight) {
 
   if (uRippleAge < 0.0 && uRippleAge2 < 0.0) {
-    return base;
+    return base + pointerHeight;
   }
 
   float ripple = 0.0;
@@ -247,7 +299,7 @@ float waterHeight(vec2 uv, float base) {
       * reached * angularBreakup * waveLife * uImpactStrength2;
   }
 
-  return base + ripple;
+  return base + ripple + pointerHeight;
 }
 
 float rippleCrest(vec2 uv) {
@@ -290,10 +342,41 @@ float rippleCrest(vec2 uv) {
   return min(crest, 1.0);
 }
 
+vec4 sampleWaveState(vec2 sampleUv) {
+  ivec2 dimensions = textureSize(uWaveState, 0);
+  ivec2 maximum = dimensions - ivec2(1);
+  vec2 pixel = clamp(sampleUv, vec2(0.0), vec2(1.0))
+    * vec2(dimensions) - 0.5;
+  ivec2 base = ivec2(floor(pixel));
+  vec2 blend = fract(pixel);
+  vec4 bottomLeft = texelFetch(uWaveState, clamp(base, ivec2(0), maximum), 0);
+  vec4 bottomRight = texelFetch(
+    uWaveState,
+    clamp(base + ivec2(1, 0), ivec2(0), maximum),
+    0
+  );
+  vec4 topLeft = texelFetch(
+    uWaveState,
+    clamp(base + ivec2(0, 1), ivec2(0), maximum),
+    0
+  );
+  vec4 topRight = texelFetch(
+    uWaveState,
+    clamp(base + ivec2(1), ivec2(0), maximum),
+    0
+  );
+  return mix(
+    mix(bottomLeft, bottomRight, blend.x),
+    mix(topLeft, topRight, blend.x),
+    blend.y
+  );
+}
+
 void main() {
   float windSignal = 0.0;
   float base = windSurface(vUv, windSignal);
-  float height = waterHeight(vUv, base);
-  float crest = rippleCrest(vUv);
-  outColor = vec4(0.5 + height * 0.45, crest, windSignal, 1.0);
+  vec4 waveState = sampleWaveState(vUv);
+  float height = base + waveState.r * 0.32;
+  float crest = clamp(waveState.a * 0.1, 0.0, 1.0);
+  outColor = vec4(0.5 + height * 0.45, crest, windSignal, waveState.a);
 }
