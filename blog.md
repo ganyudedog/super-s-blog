@@ -12,6 +12,7 @@
 - 首页展示最新 3 篇非草稿文章。
 - 归档页按发布时间倒序展示全部非草稿文章。
 - 笔记页展示 `category: Notes` 的文章。
+- 随笔页展示 `category: Essay` 的文章。
 - 文章详情页根据 Markdown 文件自动生成。
 - 站点统计自动计算文章数、笔记数和去重后的标签数。
 - 关于页、个人资料、顶部导航和响应式布局。
@@ -206,6 +207,7 @@ draft: false
 | `Frontend` | 普通文章分类 | 玫红色 |
 | `Creative Coding` | 普通文章分类 | 默认青色 |
 | `Notes` | 同时进入 `/notes`，并计入笔记数量 | 琥珀色 |
+| `Essay` | 同时进入 `/essay` | 翡翠色 |
 | 其他新分类 | 正常显示在文章和归档中 | 默认青色 |
 
 ### 添加普通分类
@@ -228,7 +230,7 @@ category: Backend
 src/components/blog/PostCard.astro
 ```
 
-当前逻辑对 `Frontend` 和 `Notes` 单独处理，其他分类使用默认青色。分类较多时，建议把颜色映射提取为对象，而不是继续增加嵌套条件。
+当前逻辑对 `Frontend`、`Notes` 和 `Essay` 单独处理，其他分类使用默认青色。分类较多时，建议把颜色映射提取为对象，而不是继续增加嵌套条件。
 
 文章详情页中的分类目前统一使用青色，对应文件：
 
@@ -284,6 +286,7 @@ getCollection('posts')
         +--> HomeView.astro       首页最新 3 篇
         +--> archive.astro        全部文章
         +--> notes.astro          Notes 分类
+        +--> essay.astro          Essay 分类
         +--> Layout.astro         统计文章、笔记和标签数量
         +--> posts/[id].astro     生成文章详情页
 ```
@@ -305,17 +308,20 @@ getCollection('posts')
 | `/index` | `src/pages/index/index.astro` | 首页内容，不重复播放开屏 |
 | `/archive` | `src/pages/archive.astro` | 全部非草稿文章，按时间倒序 |
 | `/notes` | `src/pages/notes.astro` | 仅显示 `Notes` 分类 |
+| `/essay` | `src/pages/essay.astro` | 仅显示 `Essay` 分类 |
 | `/about` | `src/pages/about.astro` | 作者与站点介绍 |
 | `/posts/<id>` | `src/pages/posts/[id].astro` | Markdown 文章详情 |
+| 其他不存在的地址 | `src/pages/404.astro` | 自定义页面未找到提示 |
 
 顶部导航配置位于 `src/config.ts`：
 
 ```ts
 export const navItems = [
   { label: '首页', href: '/index' },
-  { label: '归档', href: '/archive' },
   { label: '笔记', href: '/notes' },
+  { label: '随笔', href: '/essay' },
   { label: '关于', href: '/about' },
+  { label: '友链', href: '/friend' },
 ] as const;
 ```
 

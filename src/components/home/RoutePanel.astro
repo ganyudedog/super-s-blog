@@ -20,12 +20,66 @@ const { posts, revealed = false } = Astro.props;
   transition:name="site-route-content"
   transition:animate="none"
 >
+  <section
+    class="route-item mb-6 overflow-hidden rounded-lg border border-white/15 p-5 md:p-6"
+    aria-labelledby="about-this-place-title"
+  >
+    <header class="grid grid-cols-4 border-b border-white/10">
+      <div class="col-span-1">
+        <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-emerald-200/85">ABOUT THIS PLACE</p>
+        <h2 id="about-this-place-title" class="m-0 flex items-center gap-2 text-xl font-semibold text-slate-100 md:text-2xl">
+          <span aria-hidden="true">🍃</span>
+          <span>关于此间</span>
+        </h2>
+      </div>
+      <div class="col-span-2 text-center">
+        <p class="m-0 text-base text-cyan-50 md:text-lg">
+          <strong>月相流转之间，我以我为锚点。</strong>
+        </p>
+        <p
+          class="mx-auto mb-0 mt-2 max-w-[42rem] break-words text-sm leading-6 text-cyan-100/70 sm:text-base sm:leading-7"
+          lang="en"
+          style="font-family: 'Cambria Math', 'STIX Two Math', 'Times New Roman', serif;"
+        >
+          𝖀𝖓𝖉𝖊𝖗 𝖙𝖍𝖊 𝖋𝖑𝖔𝖜𝖎𝖓𝖌 𝖒𝖔𝖔𝖓𝖑𝖎𝖌𝖍𝖙, 𝕴 𝖆𝖓𝖈𝖍𝖔𝖗 𝖒𝖞𝖘𝖊𝖑𝖋
+        </p>
+      </div>
+      <div class="float-right col-span-1 mt-1 text-cyan-100/60 text-right">
+        <svg
+          class="translate-x-5"
+          viewBox="0 0 128 32"
+          fill="none"
+          aria-hidden="true"
+          >
+            <path d="M4 16C24 7 41 7 64 16C87 25 104 25 124 16" stroke="currentColor" stroke-width="1" opacity="0.28" />
+            <path d="M18 8A8 8 0 1 0 18 24A6 8 0 0 1 18 8Z" fill="currentColor" opacity="0.55" />
+            <circle cx="64" cy="16" r="8" fill="currentColor" opacity="0.9" />
+            <path d="M110 8A8 8 0 1 1 110 24A6 8 0 0 0 110 8Z" fill="currentColor" opacity="0.55" />
+            <circle cx="64" cy="16" r="11" stroke="currentColor" stroke-width="0.75" opacity="0.2" />
+          </svg> 
+      </div>
+    </header>
+
+    <div class="mt-5 text-[0.9rem] leading-7 text-slate-300 md:text-[0.95rem] md:leading-8">
+      <p class="m-0 text-slate-200">一个随缘更新的“次元夹缝”自留地。</p>
+
+      <p class="mb-0 mt-4">
+        这里没有宏大的叙事，只有我偶尔从日常中捕捉到的思绪碎片。有时是某本书引发的脑内风暴（随笔），有时是攻克某个 Bug 后的代码“战利品”（技术探讨），又或者只是一些在学海中打捞起的、觉得有趣的知识“小鱼干”（学习笔记）。
+      </p>
+      <br />
+      <blockquote class="m-0 border-l-2 border-emerald-200/35 pl-4 text-slate-300">
+        <p class="m-0">
+          所以，这地方本质上更接近一本公开的、随时可能跳票的个人“实验记录本”。欢迎偶尔路过，看看我最近又在折腾些什么。
+        </p>
+      </blockquote>
+    </div>
+  </section>
+
   <header class="mb-4 flex items-end justify-between gap-4 px-1">
     <div>
       <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">LATEST WRITING</p>
       <h1 id="route-title" class="m-0 text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">最近更新</h1>
     </div>
-    <a class="mb-1 rounded-md px-2 py-1 text-xs font-semibold text-cyan-200 transition hover:bg-white/10" href="/archive">查看归档</a>
   </header>
 
   <div class="grid gap-3">

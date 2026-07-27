@@ -44,6 +44,7 @@
 html {
   min-width: 320px;
   min-height: 100%;
+  scrollbar-gutter: stable;
   background: #050911;
 }
 
@@ -209,6 +210,51 @@ button {
   color: var(--accent);
 }
 
+.back-to-top {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgba(190, 231, 244, 0.28);
+  border-radius: 8px;
+  background: rgba(2, 9, 16, 0.72);
+  color: #c8f3fb;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(0.75rem);
+  transition: opacity 160ms ease, visibility 160ms ease, transform 180ms ease, background-color 160ms ease;
+}
+
+.back-to-top span {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.back-to-top[data-visible="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.back-to-top:hover {
+  background: rgba(20, 48, 61, 0.82);
+}
+
+.back-to-top:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .route-panel,
 .route-page,
 .route-document,
@@ -280,6 +326,14 @@ button {
     opacity: 0;
     visibility: hidden;
     transform: translateY(-0.5rem);
+  }
+
+}
+
+@media (min-width: 768px) {
+  .back-to-top {
+    right: max(1.5rem, env(safe-area-inset-right));
+    bottom: max(1.5rem, env(safe-area-inset-bottom));
   }
 }
 

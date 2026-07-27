@@ -1,0 +1,28 @@
+---
+import { getCollection } from 'astro:content';
+import PostCard from '../components/blog/PostCard.astro';
+import ContentLayout from '../layouts/ContentLayout.astro';
+
+const essays = (await getCollection('posts', ({ data }) => !data.draft && data.category === 'Essay'))
+  .sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
+---
+
+<ContentLayout title="随笔" description="书页、日常与偶然浮现的思绪。">
+  <header class="mb-5 px-1 text-slate-100">
+    <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-emerald-200/85">ESSAYS</p>
+    <h1 class="m-0 text-3xl font-semibold">随笔</h1>
+    <p class="mt-2 text-sm text-slate-300">从书页与日常中拾起的思绪，不急着得出结论。</p>
+  </header>
+
+  {essays.length > 0 ? (
+    <div class="grid gap-3">
+      {essays.map((post) => <PostCard post={post} />)}
+    </div>
+  ) : (
+    <section class="route-document rounded-lg border border-white/15 px-5 py-8 text-slate-300 md:px-7" aria-labelledby="essay-empty-title">
+      <p class="mb-2 text-[0.62rem] font-extrabold tracking-[0.14em] text-emerald-200/80">TO BE WRITTEN</p>
+      <h2 id="essay-empty-title" class="m-0 text-xl font-semibold text-slate-100">这里暂时还是一页留白</h2>
+      <p class="mb-0 mt-3 max-w-[58ch] text-sm leading-7">下一次被书页、月色或寻常日子绊住思绪时，新的随笔会出现在这里。</p>
+    </section>
+  )}
+</ContentLayout>

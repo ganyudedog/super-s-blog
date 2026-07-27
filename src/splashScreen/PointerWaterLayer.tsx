@@ -63,6 +63,9 @@ export default function PointerWaterLayer() {
     if (typeof window === 'undefined') return undefined;
     if (!enabled) return undefined;
 
+    const activeCanvas = document.querySelector<HTMLCanvasElement>('canvas[data-pointer-water-layer="true"]');
+    if (activeCanvas?.isConnected) return undefined;
+
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
       antialias: false,
@@ -293,7 +296,10 @@ export default function PointerWaterLayer() {
     };
 
     const handleResize = () => {
-      viewportSize.set(window.innerWidth, window.innerHeight);
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      if (viewportSize.x === width && viewportSize.y === height) return;
+      viewportSize.set(width, height);
       renderer.setSize(viewportSize.x, viewportSize.y, false);
       const nextDimensions = getSimulationDimensions(
         viewportSize.x,
@@ -343,6 +349,7 @@ export default function PointerWaterLayer() {
       simulationMaterial.dispose();
       surfaceMaterial.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       canvas.remove();
     };
   }, [enabled]);

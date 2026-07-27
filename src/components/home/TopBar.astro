@@ -8,7 +8,7 @@ interface Props {
 const { revealed = false } = Astro.props;
 const pathname = Astro.url.pathname;
 const isActive = (href: string) => href === '/index'
-  ? pathname === '/' || pathname === '/index' || pathname === '/index/'
+  ? pathname === '/' || pathname === '/index' || pathname === '/index'
   : pathname.startsWith(href);
 const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hover:bg-white/10 hover:text-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-200';
 ---

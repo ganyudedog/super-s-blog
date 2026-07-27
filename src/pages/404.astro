@@ -1,0 +1,24 @@
+---
+import ContentLayout from '../layouts/ContentLayout.astro';
+---
+
+<ContentLayout title="页面未找到" description="请求的页面不存在，或已经被移动。">
+  <article class="route-document overflow-hidden rounded-lg border border-white/15 px-5 py-8 text-slate-300 md:px-8 md:py-10">
+    <div class="flex items-center gap-3" aria-hidden="true">
+      <span class="h-px w-10 bg-cyan-100/35"></span>
+      <span class="font-mono text-xs tracking-[0.24em] text-cyan-100/75">404</span>
+      <span class="h-px flex-1 bg-gradient-to-r from-cyan-100/35 to-transparent"></span>
+    </div>
+
+    <p class="mb-1 mt-7 text-[0.62rem] font-extrabold tracking-[0.14em] text-rose-200/85">PAGE NOT FOUND</p>
+    <h1 class="m-0 text-3xl font-semibold leading-tight text-slate-100 md:text-4xl">这一页漂出了航线</h1>
+    <p class="mb-0 mt-4 max-w-[62ch] text-sm leading-7 md:text-[0.95rem]">
+      你寻找的内容可能已经移动、改名，或者还没有被写下。可以回到首页看看最近更新，也可以从归档重新寻找。
+    </p>
+
+    <nav class="mt-7 flex flex-wrap gap-3" aria-label="页面未找到后的导航">
+      <a class="rounded-md border border-cyan-200/25 bg-cyan-100/12 px-4 py-2.5 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-100/20" href="/index">返回首页</a>
+      <a class="rounded-md border border-white/15 bg-black/20 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10" href="/notes">浏览笔记</a>
+    </nav>
+  </article>
+</ContentLayout>

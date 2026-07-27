@@ -63,6 +63,13 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     const host = hostRef.current;
     if (!host) return;
 
+    const activeHost = document.querySelector<HTMLElement>('[data-water-scene-active="true"]');
+    if (activeHost && activeHost !== host && activeHost.isConnected) {
+      console.warn(`${LOG} duplicate mount ignored`);
+      return;
+    }
+    host.dataset.waterSceneActive = 'true';
+
     console.groupCollapsed(`${LOG} boot`);
     console.info(`${LOG} GLSL loaded`, {
       heightVertex: heightVertexShader.length,
@@ -1070,12 +1077,17 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       });
     };
 
+    let lastResizeWidth = 0;
+    let lastResizeHeight = 0;
     const resize = () => {
       const width = Math.max(host.clientWidth, 1);
       const height = Math.max(host.clientHeight, 1);
       const renderScale = 1;
       const internalWidth = Math.max(1, Math.floor(width * renderScale));
       const internalHeight = Math.max(1, Math.floor(height * renderScale));
+      if (internalWidth === lastResizeWidth && internalHeight === lastResizeHeight) return;
+      lastResizeWidth = internalWidth;
+      lastResizeHeight = internalHeight;
       renderer.setSize(internalWidth, internalHeight, false);
       const pixelRatio = renderer.getPixelRatio();
       const renderWidth = Math.max(1, Math.floor(internalWidth * pixelRatio));
@@ -1119,6 +1131,10 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       const impactScreenY = (-projectedImpact.y * 0.5 + 0.5) * height;
       host.dataset.impactScreenX = impactScreenX.toFixed(2);
       host.dataset.impactScreenY = impactScreenY.toFixed(2);
+      if (host.dataset.firstFrame === 'true') {
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+      }
       console.info(`${LOG} resized`, {
         width,
         height,
@@ -1572,7 +1588,9 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       if (videoTexture !== fallbackVideoTexture) fallbackVideoTexture.dispose();
       (lightGlow.material as THREE.Material).dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
+      delete host.dataset.waterSceneActive;
     };
   }, [intro, onComplete]);
 

@@ -3,7 +3,7 @@ import { siteConfig } from '../config';
 import ContentLayout from '../layouts/ContentLayout.astro';
 ---
 
-<ContentLayout title="关于" description={`关于 ${siteConfig.author.name} 与这个博客。`}>
+<ContentLayout title="关于" description={`关于${siteConfig.author.name}与这个博客。`}>
   <article class="route-document px-1 py-5 text-slate-200 md:px-2 md:py-7">
     <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-rose-200/85">ABOUT</p>
     <h1 class="m-0 text-3xl font-semibold text-slate-100">{siteConfig.author.name}</h1>

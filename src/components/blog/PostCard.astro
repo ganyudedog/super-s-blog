@@ -15,7 +15,9 @@ const categoryClass = post.data.category === 'Frontend'
   ? 'text-rose-200 border-rose-200/25'
   : post.data.category === 'Notes'
     ? 'text-amber-200 border-amber-200/25'
-    : 'text-cyan-200 border-cyan-200/25';
+    : post.data.category === 'Essay'
+      ? 'text-emerald-200 border-emerald-200/25'
+      : 'text-cyan-200 border-cyan-200/25';
 ---
 
 <article class="route-item article-card rounded-lg border border-white/15 p-4 md:p-5">

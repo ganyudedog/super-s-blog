@@ -30,15 +30,14 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
+		<link rel="icon" href="/image/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
 		<meta name="theme-color" content="#050911" />
 		<style is:inline>
 			html, body { margin: 0; min-height: 100%; background: #071421; }
 		</style>
-		<title>{title}</title>
+		<title>{ `${title} | ${description}` }</title>
 		<ClientRouter fallback="swap" />
 	</head>
 	<body>
@@ -53,7 +52,7 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 			<BackgroundVideo revealed={!intro} />
 			<SplashScreen
 				intro={intro}
-				client:only="react"
+				client:load
 				transition:persist="water-scene"
 				transition:persist-props
 			/>
@@ -62,32 +61,127 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 				class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-24 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
 				data-home-content
 			>
-				<PersonalPanel revealed={!intro} />
-				<StatsPanel
-					postCount={posts.length}
-					noteCount={noteCount}
-					tagCount={tags.size}
-					revealed={!intro}
-				/>
+				<div class="contents md:col-start-1 md:row-start-1 md:grid md:content-start md:gap-5 xl:contents">
+					<PersonalPanel revealed={!intro} />
+					<StatsPanel
+						postCount={posts.length}
+						noteCount={noteCount}
+						tagCount={tags.size}
+						revealed={!intro}
+					/>
+				</div>
 				<slot />
 			</main>
+			<button
+				class="back-to-top"
+				type="button"
+				aria-label="回到页面顶部"
+				title="回到顶部"
+				data-back-to-top
+				data-visible="false"
+				transition:persist="back-to-top"
+			>
+				<span aria-hidden="true">↑</span>
+			</button>
 		</div>
 		<script>
-			import { swapFunctions } from 'astro:transitions/client';
+			import { gsap } from 'gsap';
+
+			const bindScrollChrome = () => {
+				const button = document.querySelector<HTMLButtonElement>('[data-back-to-top]');
+				if (!button || button.dataset.scrollBound === 'true') return;
+				button.dataset.scrollBound = 'true';
+
+				let frame = 0;
+				let topBarHidden = false;
+				let scrollTween: ReturnType<typeof gsap.to> | null = null;
+				const update = () => {
+					frame = 0;
+					const topBar = document.querySelector<HTMLElement>('.top-bar');
+					const hideThreshold = window.matchMedia('(max-width: 767px)').matches ? 72 : 120;
+					const shouldHide = window.scrollY > hideThreshold;
+					if (!topBar || shouldHide === topBarHidden) return;
+
+					topBarHidden = shouldHide;
+					gsap.killTweensOf(topBar);
+					if (shouldHide) {
+						topBar.classList.remove('is-menu-open');
+						topBar.querySelector<HTMLButtonElement>('.nav-menu-button')?.setAttribute('aria-expanded', 'false');
+						button.dataset.visible = 'false';
+						gsap.to(topBar, {
+							yPercent: -125,
+							opacity: 0,
+							duration: 0.2,
+							ease: 'power2.in',
+							overwrite: true,
+							onStart: () => { topBar.style.pointerEvents = 'none'; },
+							onComplete: () => {
+								if (topBarHidden) button.dataset.visible = 'true';
+							},
+						});
+					} else {
+						button.dataset.visible = 'false';
+						gsap.to(topBar, {
+							yPercent: 0,
+							opacity: 1,
+							duration: 0.4,
+							ease: 'power2.out',
+							overwrite: true,
+							onComplete: () => { topBar.style.pointerEvents = ''; },
+						});
+					}
+				};
+
+				const scheduleUpdate = () => {
+					if (frame !== 0) return;
+					frame = window.requestAnimationFrame(update);
+				};
+
+				button.addEventListener('click', () => {
+					const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+					const scrollPosition = { y: window.scrollY };
+					scrollTween?.kill();
+					scrollTween = gsap.to(scrollPosition, {
+						y: 0,
+						duration: reduceMotion ? 0 : 0.2,
+						ease: 'power3.out',
+						overwrite: true,
+						onUpdate: () => window.scrollTo(0, scrollPosition.y),
+						onComplete: () => {
+							window.scrollTo(0, 0);
+							scheduleUpdate();
+						},
+					});
+				});
+				window.addEventListener('scroll', scheduleUpdate, { passive: true });
+				window.addEventListener('resize', scheduleUpdate, { passive: true });
+				document.addEventListener('astro:after-swap', scheduleUpdate);
+				update();
+			};
+
+			document.addEventListener('astro:page-load', bindScrollChrome);
+			bindScrollChrome();
 
 			document.addEventListener('astro:before-swap', (event) => {
 				const currentRoute = document.querySelector<HTMLElement>('.route-panel');
 				const nextRoute = event.newDocument.querySelector<HTMLElement>('.route-panel');
 				if (!currentRoute || !nextRoute) return;
+
+				// The WebGL layers stay live in the current document. Avoid covering them
+				// with a root view-transition snapshot while only the route panel changes.
+				void event.viewTransition.ready.catch(() => undefined);
+				void event.viewTransition.finished.catch(() => undefined);
+				void event.viewTransition.updateCallbackDone.catch(() => undefined);
 				event.viewTransition.skipTransition();
 
+				const nextTitle = event.newDocument.title;
+				const nextDescription = event.newDocument.querySelector<HTMLMetaElement>('meta[name="description"]')?.content;
 				event.swap = () => {
-					swapFunctions.deselectScripts(event.newDocument);
-					swapFunctions.swapRootAttributes(event.newDocument);
-					swapFunctions.swapHeadElements(event.newDocument);
-					const restoreFocus = swapFunctions.saveFocus();
 					currentRoute.replaceWith(nextRoute);
-					restoreFocus();
+					document.title = nextTitle;
+					if (nextDescription) {
+						document.querySelector<HTMLMetaElement>('meta[name="description"]')?.setAttribute('content', nextDescription);
+					}
 				};
 			});
 
