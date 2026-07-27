@@ -163,7 +163,7 @@ float pointerWakeField(vec2 uv, out float foam) {
   return clamp(height, -0.085, 0.072);
 }
 
-float windSurface(vec2 uv, out float windSignal) {
+float windSurface(vec2 uv, out float windSignal, out float lightingHeight) {
   // The large-scale current keeps a clear wind direction while locally bending
   // and grouping the smaller waves into irregular packets.
   vec2 windDirection = normalize(uWindDirection);
@@ -206,13 +206,16 @@ float windSurface(vec2 uv, out float windSignal) {
     vec2(alongWind, acrossWind + crossCurrent * 1.25),
     microSignal
   );
+  lightingHeight = (
+    longWave + mediumWave + shortWave * 0.62
+  ) * windEnvelope;
   float base = (longWave + mediumWave + shortWave + capillaryWave) * windEnvelope;
   base += microWaves * mix(0.72, 1.0, windEnvelope);
 
   float slopeSignal = abs(cos(mediumPhase)) * 0.44
     + abs(cos(shortPhase)) * 0.36
     + abs(cos(capillaryPhase)) * 0.2;
-  windSignal = clamp(slopeSignal * calmPatch * 0.82 + microSignal * 0.58, 0.0, 1.0);
+  windSignal = clamp(slopeSignal * calmPatch * 0.82 + microSignal * 0.18, 0.0, 1.0);
   return base;
 }
 
@@ -374,11 +377,17 @@ vec4 sampleWaveState(vec2 sampleUv) {
 
 void main() {
   float windSignal = 0.0;
-  float base = windSurface(vUv, windSignal);
+  float lightingHeight = 0.0;
+  float base = windSurface(vUv, windSignal, lightingHeight);
   vec4 waveState = sampleWaveState(vUv);
   float height = base + waveState.r * 0.32;
   float crest = clamp(waveState.a * 0.1, 0.0, 1.0);
-  // Alpha carries the undisturbed wind surface so lighting cannot mistake an
-  // impact wave for a large moving light source.
-  outColor = vec4(0.5 + height * 0.45, crest, windSignal, 0.5 + base * 0.45);
+  // Alpha excludes impact, capillary, and radial micro waves. Lighting follows
+  // a coherent -X flow while the complete surface keeps its smaller details.
+  outColor = vec4(
+    0.5 + height * 0.45,
+    crest,
+    windSignal,
+    0.5 + lightingHeight * 0.45
+  );
 }

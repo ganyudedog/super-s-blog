@@ -1269,7 +1269,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     const render = () => {
       animationFrame = requestAnimationFrame(render);
       const now = performance.now() / 1000;
-      if (now - lastRenderedAt < 1 / 24) return;
+      if (now - lastRenderedAt < 1 / 30 - 0.001) return;
       lastRenderedAt = now;
       const elapsed = now - startedAt;
 

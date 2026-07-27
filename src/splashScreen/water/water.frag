@@ -187,16 +187,6 @@ void main() {
     eyeDirection,
     48.0
   );
-  vec3 areaLightDirectionA = normalize(
-    extendedLightDirection + vec3(0.16, 0.045, 0.1)
-  );
-  vec3 areaLightDirectionB = normalize(
-    extendedLightDirection + vec3(-0.14, 0.035, -0.09)
-  );
-  float scatteredReflection = 0.5 * (
-    seascapeSpecular(normal, areaLightDirectionA, eyeDirection, 18.0)
-    + seascapeSpecular(normal, areaLightDirectionB, eyeDirection, 18.0)
-  );
   float localBroad = seascapeSpecular(
     normal,
     pointLightDirection,
@@ -216,10 +206,9 @@ void main() {
     10.0
   );
   float directReflection = surfaceDiffuse * (0.11 + facetStrength * 0.08)
-    + crestDiffuse * 0.34
-    + broadReflection * 0.26
-    + scatteredReflection * 0.18
-    + fineReflection * 0.075;
+    + crestDiffuse * 0.38
+    + broadReflection * 0.36
+    + fineReflection * 0.08;
   float localReflection = 1.0 - exp(
     -(localBroad * 0.88 + localFine * 0.2 + stableLocalReflection * 0.62)
   );
