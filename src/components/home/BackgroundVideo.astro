@@ -22,48 +22,14 @@ const { revealed = false } = Astro.props;
     class="background-video"
     autoplay
     muted
+    loop
     playsinline
     preload="auto"
     disablepictureinpicture
     controlslist="nodownload noplaybackrate nofullscreen"
     tabindex="-1"
-    data-seamless-video
   >
     <source src="/background/WUWA 尤诺H.264.mp4" type="video/mp4" />
   </video>
   <div class="background-video-grade"></div>
 </div>
-
-<script>
-  document.querySelectorAll<HTMLVideoElement>('[data-seamless-video]').forEach((video) => {
-    if (video.dataset.loopBound === 'true') return;
-    video.dataset.loopBound = 'true';
-    video.loop = false;
-    const stableStart = 0.04;
-    const endGuard = 0.7;
-    let isLoopSeeking = false;
-    const maintainLoop = () => {
-      if (
-        Number.isFinite(video.duration)
-        && video.duration > endGuard
-        && !isLoopSeeking
-        && video.currentTime >= video.duration - endGuard
-      ) {
-        isLoopSeeking = true;
-        if (typeof video.fastSeek === 'function') video.fastSeek(stableStart);
-        else video.currentTime = stableStart;
-        void video.play().catch(() => undefined);
-      }
-    };
-    video.addEventListener('timeupdate', maintainLoop);
-    video.addEventListener('seeked', () => {
-      isLoopSeeking = false;
-      void video.play().catch(() => undefined);
-    });
-    video.addEventListener('ended', () => {
-      isLoopSeeking = false;
-      video.currentTime = stableStart;
-      void video.play().catch(() => undefined);
-    });
-  });
-</script>

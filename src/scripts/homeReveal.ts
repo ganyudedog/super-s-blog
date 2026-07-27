@@ -53,7 +53,7 @@ export function initHomeReveal() {
   if (video) {
     video.muted = true;
     video.defaultMuted = true;
-    video.loop = false;
+    video.loop = true;
     video.controls = false;
     void video.play().catch(() => undefined);
     video.addEventListener('error', () => stage.classList.add('has-video-error'));
