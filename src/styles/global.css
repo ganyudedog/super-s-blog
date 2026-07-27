@@ -76,9 +76,25 @@ button {
   background: #050911;
 }
 
+.home-boot-surface {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, #071827 0%, #071421 52%, #040a12 100%),
+    #050911;
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+.home-boot-surface.is-hidden {
+  opacity: 0;
+}
+
 .background-video-layer {
   clip-path: inset(100% 0 0 0);
-  background: #050911;
+  background: transparent;
   will-change: clip-path, opacity;
 }
 
@@ -118,7 +134,9 @@ button {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: #050911;
+  background:
+    linear-gradient(180deg, #071827 0%, #071421 52%, #040a12 100%),
+    #050911;
 }
 
 .water-canvas-host {
@@ -132,6 +150,12 @@ button {
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.water-canvas-host[data-first-frame="true"] canvas {
+  opacity: 1;
 }
 
 .glass-panel {

@@ -39,6 +39,7 @@ export function initHomeReveal() {
   stage.dataset.revealBound = 'true';
 
   const video = document.querySelector<HTMLVideoElement>('#background-video');
+  const bootSurface = document.querySelector<HTMLElement>('[data-home-boot]');
   const background = document.querySelector<HTMLElement>('[data-background-reveal]');
   const topBar = document.querySelector<HTMLElement>('[data-reveal-top]');
   const leftPanel = document.querySelector<HTMLElement>('[data-reveal-left]');
@@ -46,6 +47,9 @@ export function initHomeReveal() {
   const routePanel = document.querySelector<HTMLElement>('[data-reveal-route]');
 
   stage.inert = true;
+  const hideBootSurface = () => bootSurface?.classList.add('is-hidden');
+  if (document.querySelector('[data-first-frame="true"]')) hideBootSurface();
+  window.addEventListener('water:first-frame', hideBootSurface, { once: true });
   if (video) {
     video.muted = true;
     video.defaultMuted = true;
@@ -60,6 +64,7 @@ export function initHomeReveal() {
   const finishReveal = () => {
     if (finished) return;
     finished = true;
+    hideBootSurface();
     const nightBackdrop = document.querySelector<HTMLElement>('[data-water-night]');
     if (background) {
       gsap.set(background, { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1 });

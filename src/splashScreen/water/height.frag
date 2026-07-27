@@ -197,10 +197,10 @@ float windSurface(vec2 uv, out float windSignal) {
   float windEnvelope = 0.45 + 0.55 * smoothstep(0.0, 0.9, uv.y);
   float wavePacket = smoothstep(-0.72, 0.68, packetNoise);
   float calmPatch = 0.48 + wavePacket * 0.52;
-  float longWave = sin(longPhase) * 0.0095;
-  float mediumWave = sin(mediumPhase) * 0.0046 * (0.58 + wavePacket * 0.42);
-  float shortWave = sin(shortPhase) * 0.00235 * calmPatch;
-  float capillaryWave = sin(capillaryPhase) * 0.00115 * wavePacket;
+  float longWave = sin(longPhase) * 0.0135;
+  float mediumWave = sin(mediumPhase) * 0.0064 * (0.58 + wavePacket * 0.42);
+  float shortWave = sin(shortPhase) * 0.0031 * calmPatch;
+  float capillaryWave = sin(capillaryPhase) * 0.00145 * wavePacket;
   float microSignal = 0.0;
   float microWaves = microWaveField(
     vec2(alongWind, acrossWind + crossCurrent * 1.25),
@@ -378,5 +378,7 @@ void main() {
   vec4 waveState = sampleWaveState(vUv);
   float height = base + waveState.r * 0.32;
   float crest = clamp(waveState.a * 0.1, 0.0, 1.0);
-  outColor = vec4(0.5 + height * 0.45, crest, windSignal, waveState.a);
+  // Alpha carries the undisturbed wind surface so lighting cannot mistake an
+  // impact wave for a large moving light source.
+  outColor = vec4(0.5 + height * 0.45, crest, windSignal, 0.5 + base * 0.45);
 }

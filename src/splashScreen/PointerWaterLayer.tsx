@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import pointerSimulationFragmentShader from './water/pointer-simulation.frag?raw';
 import pointerSimulationVertexShader from './water/pointer-simulation.vert?raw';
@@ -30,8 +30,38 @@ function getSimulationDimensions(width: number, height: number) {
 }
 
 export default function PointerWaterLayer() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    let delayedStart = 0;
+    const enableImmediately = () => {
+      window.clearTimeout(delayedStart);
+      setEnabled(true);
+    };
+    const enableAfterMainScene = () => {
+      window.clearTimeout(delayedStart);
+      delayedStart = window.setTimeout(() => setEnabled(true), 280);
+    };
+
+    window.addEventListener('water:ready', enableAfterMainScene, { once: true });
+    window.addEventListener('pointermove', enableImmediately, {
+      once: true,
+      passive: true,
+    });
+    if (document.querySelector('[data-first-frame="true"]')) {
+      enableAfterMainScene();
+    }
+
+    return () => {
+      window.clearTimeout(delayedStart);
+      window.removeEventListener('water:ready', enableAfterMainScene);
+      window.removeEventListener('pointermove', enableImmediately);
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    if (!enabled) return undefined;
 
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
@@ -315,7 +345,7 @@ export default function PointerWaterLayer() {
       renderer.dispose();
       canvas.remove();
     };
-  }, []);
+  }, [enabled]);
 
   return null;
 }

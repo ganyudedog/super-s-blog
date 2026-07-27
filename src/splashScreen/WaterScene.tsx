@@ -13,6 +13,8 @@ import thicknessFragmentShader from './water/thickness.frag';
 import foamFragmentShader from './water/foam.frag';
 import sprayVertexShader from './water/spray.vert';
 import sprayFragmentShader from './water/spray.frag';
+import dropVertexShader from './water/drop.vert';
+import dropFragmentShader from './water/drop.frag';
 
 interface WaterSceneProps {
   onComplete?: () => void;
@@ -106,7 +108,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uWaterSize: { value: new THREE.Vector2(WATER_WIDTH, WATER_LENGTH) },
       uImpactStrength2: { value: 0.62 },
       uWindDirection: { value: WIND_DIRECTION.clone() },
-      uWindSpeed: { value: 0.009 },
+      uWindSpeed: { value: 0.022 },
       uPointerRipples: {
         value: Array.from(
           { length: POINTER_RIPPLE_COUNT },
@@ -251,6 +253,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
     videoTexture.generateMipmaps = false;
+    const distantLightDirection = new THREE.Vector3(-0.32, 0.84, 0.44).normalize();
     const initialDeepColor = new THREE.Color(0x030711);
     const initialSurfaceColor = new THREE.Color(0x0a1c2c);
     const revealedDeepColor = new THREE.Color(0x071728);
@@ -260,6 +263,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uHeightTexel: { value: new THREE.Vector2(1 / heightTargetSize, 1 / heightTargetSize) },
       uHeightScale: { value: 1.45 },
       uLightPosition: { value: lightPosition },
+      uDistantLightDirection: { value: distantLightDirection },
       uDeepColor: { value: (intro ? initialDeepColor : revealedDeepColor).clone() },
       uSurfaceColor: { value: (intro ? initialSurfaceColor : revealedSurfaceColor).clone() },
       uTime: { value: 0 },
@@ -407,6 +411,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     }
     const environmentTexture = new THREE.CanvasTexture(environmentCanvas);
     environmentTexture.colorSpace = THREE.SRGBColorSpace;
+    environmentTexture.mapping = THREE.EquirectangularReflectionMapping;
     environmentTexture.wrapS = THREE.RepeatWrapping;
     environmentTexture.minFilter = THREE.LinearMipmapLinearFilter;
     environmentTexture.magFilter = THREE.LinearFilter;
@@ -427,6 +432,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       lightPosition.copy(camera.position).addScaledVector(direction, 10.5);
       pointLight.position.copy(lightPosition);
       lightGlow.position.copy(lightPosition);
+      distantLightDirection.copy(lightPosition).sub(impactWorldPosition).normalize();
     };
     placeLightAtScreenOrigin();
     console.info(`${LOG} water mesh ready`, {
@@ -435,20 +441,21 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       impactUv: heightUniforms.uRippleCenter.value.toArray(),
     });
 
-    const dropMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0xd9efff,
-      emissive: 0x1c5c8d,
-      emissiveIntensity: 0.22,
-      roughness: 0.012,
-      metalness: 0,
-      transmission: 0.92,
-      ior: 1.333,
-      thickness: 0.34,
-      attenuationColor: new THREE.Color(0x9bc9ef),
-      attenuationDistance: 2.2,
+    const dropUniforms = {
+      uSceneTexture: { value: sceneTarget.texture },
+      uResolution: { value: new THREE.Vector2(1, 1) },
+      uTime: { value: 0 },
+    };
+    const dropMaterial = new THREE.RawShaderMaterial({
+      vertexShader: dropVertexShader,
+      fragmentShader: dropFragmentShader,
+      uniforms: dropUniforms,
+      glslVersion: THREE.GLSL3,
       transparent: true,
-      opacity: 0.82,
+      depthTest: true,
       depthWrite: false,
+      blending: THREE.NormalBlending,
+      side: THREE.FrontSide,
     });
     const dropProfile = [
       new THREE.Vector2(0.0, 0.82),
@@ -461,10 +468,14 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       new THREE.Vector2(0.25, -0.76),
       new THREE.Vector2(0.0, -0.8),
     ];
-    const drop = new THREE.Mesh(new THREE.LatheGeometry(dropProfile, 36), dropMaterial);
+    const drop = new THREE.Mesh(
+      new THREE.LatheGeometry(dropProfile, 36),
+      dropMaterial,
+    );
     drop.scale.setScalar(0.22);
     drop.position.set(0, 5.5, IMPACT_Z);
     drop.visible = false;
+    drop.renderOrder = 20;
     scene.add(drop);
 
     const splashUniforms = {
@@ -1071,6 +1082,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       const renderHeight = Math.max(1, Math.floor(internalHeight * pixelRatio));
       sceneTarget.setSize(renderWidth, renderHeight);
       splashUniforms.uResolution.value.set(renderWidth, renderHeight);
+      dropUniforms.uResolution.value.set(renderWidth, renderHeight);
       waterUniforms.uResolution.value.set(renderWidth, renderHeight);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
@@ -1263,6 +1275,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
 
       heightUniforms.uTime.value = elapsed;
       waterUniforms.uTime.value = elapsed;
+      dropUniforms.uTime.value = elapsed;
       splashUniforms.uTime.value = elapsed;
       foamUniforms.uTime.value = elapsed;
       waterUniforms.uRippleAge.value = heightUniforms.uRippleAge.value;
@@ -1301,6 +1314,12 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
 
       if (intro && elapsed >= DROP_DELAY && !dropLaunchLogged) {
         dropLaunchLogged = true;
+        const dropWasVisible = drop.visible;
+        drop.visible = false;
+        renderer.setRenderTarget(sceneTarget);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        drop.visible = dropWasVisible;
         console.info(`${LOG} drop launched`, { delay: DROP_DELAY, duration: DROP_DURATION });
       }
 
@@ -1448,6 +1467,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
 
       if (firstFrame) {
         firstFrame = false;
+        host.dataset.firstFrame = 'true';
+        window.dispatchEvent(new CustomEvent('water:first-frame'));
         console.info(`${LOG} first frame rendered`, {
           canvas: [renderer.domElement.width, renderer.domElement.height],
           passes: ['height', 'front-depth', 'back-depth', 'refraction', 'water'],
@@ -1478,8 +1499,11 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
         ]);
         const sceneTexture = splashUniforms.uSceneTexture.value;
         splashUniforms.uSceneTexture.value = videoTexture;
+        const dropWasVisible = drop.visible;
+        drop.visible = false;
         renderer.setRenderTarget(sceneTarget);
         renderer.render(scene, camera);
+        drop.visible = dropWasVisible;
         splashUniforms.uSceneTexture.value = sceneTexture;
       } catch (error) {
         console.warn(`${LOG} shader warmup fell back to first render`, error);
