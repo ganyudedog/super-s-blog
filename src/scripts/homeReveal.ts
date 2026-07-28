@@ -37,6 +37,14 @@ export function initHomeReveal() {
   const stage = document.querySelector<HTMLElement>('[data-home-stage]');
   if (!stage || stage.dataset.revealBound === 'true') return;
   stage.dataset.revealBound = 'true';
+  const traceReveal = (phase: string, detail: Record<string, unknown> = {}) => {
+    console.info(`[HomeReveal][timing] ${JSON.stringify({
+      phase,
+      pageMs: Math.round(performance.now() * 10) / 10,
+      ...detail,
+    })}`);
+  };
+  traceReveal('initialized', { pathname: window.location.pathname });
 
   const video = document.querySelector<HTMLVideoElement>('#background-video');
   const bootSurface = document.querySelector<HTMLElement>('[data-home-boot]');
@@ -61,9 +69,11 @@ export function initHomeReveal() {
 
   let revealed = false;
   let finished = false;
+  let sceneFallback = 0;
   const finishReveal = () => {
     if (finished) return;
     finished = true;
+    window.clearTimeout(sceneFallback);
     hideBootSurface();
     const nightBackdrop = document.querySelector<HTMLElement>('[data-water-night]');
     if (background) {
@@ -83,6 +93,7 @@ export function initHomeReveal() {
     rightPanel?.classList.add('is-lit');
     routePanel?.classList.add('is-lit');
     window.dispatchEvent(new CustomEvent('home:revealed'));
+    traceReveal('finished');
   };
 
   const startReveal = (detail: WaterRevealDetail = {}) => {
@@ -197,17 +208,33 @@ export function initHomeReveal() {
   };
 
   const onWaterReveal = (event: Event) => {
+    window.clearTimeout(sceneFallback);
+    traceReveal('water-reveal-received');
     startReveal((event as CustomEvent<WaterRevealDetail>).detail);
   };
   window.addEventListener('water:reveal', onWaterReveal, { once: true });
 
-  let sceneFallback = 0;
+  const startFallbackReveal = () => {
+    traceReveal('fallback-fired');
+    stage.dataset.waterIntroSkipped = 'true';
+    window.dispatchEvent(new CustomEvent('water:intro-skip'));
+    startReveal();
+  };
   const armSceneFallback = () => {
     window.clearTimeout(sceneFallback);
-    sceneFallback = window.setTimeout(() => startReveal(), 4200);
+    traceReveal('impact-fallback-armed', { timeoutMs: 5000 });
+    sceneFallback = window.setTimeout(startFallbackReveal, 5000);
   };
-  window.addEventListener('water:ready', armSceneFallback, { once: true });
+  window.addEventListener('water:intro-start', () => {
+    window.clearTimeout(sceneFallback);
+    traceReveal('intro-start-received');
+  }, { once: true });
+  window.addEventListener('water:impact', () => {
+    traceReveal('impact-received');
+    armSceneFallback();
+  }, { once: true });
 
-  // Keep the page usable when WebGL initialization fails before water:ready.
-  sceneFallback = window.setTimeout(() => startReveal(), 12000);
+  // Keep the page usable only when WebGL fails before the intro can start.
+  sceneFallback = window.setTimeout(startFallbackReveal, 12000);
+  traceReveal('initial-fallback-armed', { timeoutMs: 12000 });
 }

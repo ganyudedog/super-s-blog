@@ -36,6 +36,13 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 		<meta name="theme-color" content="#050911" />
 		<style is:inline>
 			html, body { margin: 0; min-height: 100%; background: #071421; }
+			.home-stage { min-height: 100dvh; background: #050911; }
+			.home-boot-surface {
+				position: fixed;
+				inset: 0;
+				z-index: 11;
+				background: linear-gradient(180deg, #071827 0%, #071421 52%, #040a12 100%);
+			}
 		</style>
 		<title>{ `${title} | ${description}` }</title>
 		<ClientRouter fallback="swap" />

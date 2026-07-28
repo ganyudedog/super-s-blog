@@ -80,7 +80,7 @@ button {
 .home-boot-surface {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 11;
   pointer-events: none;
   background:
     linear-gradient(180deg, #071827 0%, #071421 52%, #040a12 100%),

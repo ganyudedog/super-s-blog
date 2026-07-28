@@ -7,6 +7,8 @@ import heightFragmentShader from './water/height.frag';
 import waveFragmentShader from './water/wave.frag';
 import waterVertexShader from './water/water.vert';
 import waterFragmentShader from './water/water.frag';
+import splashCoreVertexShader from './water/splash-core.vert';
+import splashCoreFragmentShader from './water/splash-core.frag';
 import splashVertexShader from './water/splash.vert';
 import splashFragmentShader from './water/splash.frag';
 import thicknessFragmentShader from './water/thickness.frag';
@@ -23,6 +25,7 @@ interface WaterSceneProps {
 
 const LOG = '[WaterScene]';
 const IMPACT_Z = -2;
+const DROP_START_Y = 3.65;
 const DROP_DELAY = 0.65;
 const DROP_DURATION = 1.05;
 const SECONDARY_IMPACT_DELAY = 0.78;
@@ -69,6 +72,26 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       return;
     }
     host.dataset.waterSceneActive = 'true';
+    let playIntro = intro
+      && document.querySelector<HTMLElement>('[data-home-stage]')?.dataset.waterIntroSkipped !== 'true';
+    const waterDebugMode = import.meta.env.DEV
+      ? new URLSearchParams(window.location.search).get('waterDebug')
+      : null;
+    const holdSplashForDiagnostics = waterDebugMode === 'hold-splash'
+      || waterDebugMode === 'hold-core';
+    const holdCoreSplashForDiagnostics = waterDebugMode === 'hold-core';
+    const traceTiming = (stage: string, detail: Record<string, unknown> = {}) => {
+      console.info(`${LOG}[timing] ${JSON.stringify({
+        stage,
+        pageMs: Math.round(performance.now() * 10) / 10,
+        ...detail,
+      })}`);
+    };
+    traceTiming('effect-mounted', {
+      intro,
+      playIntro,
+      pathname: window.location.pathname,
+    });
 
     console.groupCollapsed(`${LOG} boot`);
     console.info(`${LOG} GLSL loaded`, {
@@ -91,11 +114,17 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     host.appendChild(renderer.domElement);
 
     const gl = renderer.getContext();
+    const parallelShaderCompile = gl.getExtension('KHR_parallel_shader_compile');
     console.info(`${LOG} renderer ready`, {
       webgl2: renderer.capabilities.isWebGL2,
       vendor: gl.getParameter(gl.VENDOR),
       renderer: gl.getParameter(gl.RENDERER),
       maxTextureSize: renderer.capabilities.maxTextureSize,
+      parallelShaderCompile: Boolean(parallelShaderCompile),
+    });
+    traceTiming('renderer-ready', {
+      webgl2: renderer.capabilities.isWebGL2,
+      parallelShaderCompile: Boolean(parallelShaderCompile),
     });
 
     const scene = new THREE.Scene();
@@ -223,6 +252,15 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       stencilBuffer: false,
     });
     sceneTarget.texture.name = 'splash-refraction-background';
+    const splashWarmupTarget = new THREE.WebGLRenderTarget(4, 4, {
+      type: THREE.UnsignedByteType,
+      format: THREE.RGBAFormat,
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      depthBuffer: true,
+      stencilBuffer: false,
+    });
+    splashWarmupTarget.texture.name = 'splash-pipeline-warmup';
     const createThicknessTarget = (name: string) => {
       const target = new THREE.WebGLRenderTarget(1, 1, {
         type: THREE.HalfFloatType,
@@ -271,8 +309,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uHeightScale: { value: 1.45 },
       uLightPosition: { value: lightPosition },
       uDistantLightDirection: { value: distantLightDirection },
-      uDeepColor: { value: (intro ? initialDeepColor : revealedDeepColor).clone() },
-      uSurfaceColor: { value: (intro ? initialSurfaceColor : revealedSurfaceColor).clone() },
+      uDeepColor: { value: (playIntro ? initialDeepColor : revealedDeepColor).clone() },
+      uSurfaceColor: { value: (playIntro ? initialSurfaceColor : revealedSurfaceColor).clone() },
       uTime: { value: 0 },
       uRippleAge: { value: -1 },
       uRippleCenter: { value: heightUniforms.uRippleCenter.value },
@@ -284,7 +322,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uVideoUvScale: { value: new THREE.Vector2(1, 1) },
       uVideoUvOffset: { value: new THREE.Vector2(0, 0) },
       uResolution: { value: new THREE.Vector2(1, 1) },
-      uRevealProgress: { value: intro ? 0 : 1 },
+      uRevealProgress: { value: playIntro ? 0 : 1 },
     };
     const waterMaterial = new THREE.RawShaderMaterial({
       vertexShader: waterVertexShader,
@@ -480,8 +518,9 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       dropMaterial,
     );
     drop.scale.setScalar(0.22);
-    drop.position.set(0, 5.5, IMPACT_Z);
+    drop.position.set(0, DROP_START_Y, IMPACT_Z);
     drop.visible = false;
+    drop.frustumCulled = false;
     drop.renderOrder = 20;
     scene.add(drop);
 
@@ -505,9 +544,12 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uRimMode: { value: 0 },
       uWaterLevel: { value: water.position.y - 0.02 },
     };
-    const waveMaterial = new THREE.RawShaderMaterial({
-      vertexShader: splashVertexShader,
-      fragmentShader: splashFragmentShader,
+    const createWaveMaterial = (
+      vertexShader: string,
+      fragmentShader = splashFragmentShader,
+    ) => new THREE.RawShaderMaterial({
+      vertexShader,
+      fragmentShader,
       uniforms: splashUniforms,
       glslVersion: THREE.GLSL3,
       transparent: true,
@@ -516,6 +558,16 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       blending: THREE.NormalBlending,
       side: THREE.DoubleSide,
     });
+    const coreWaveMaterial = createWaveMaterial(
+      splashCoreVertexShader,
+      splashCoreFragmentShader,
+    );
+    coreWaveMaterial.side = THREE.FrontSide;
+    coreWaveMaterial.polygonOffset = true;
+    coreWaveMaterial.polygonOffsetFactor = -1;
+    coreWaveMaterial.polygonOffsetUnits = -1;
+    const waveMaterial = createWaveMaterial(splashVertexShader);
+    coreWaveMaterial.forceSinglePass = true;
     waveMaterial.forceSinglePass = true;
     const crownSegments = 96;
     const crownRings = 18;
@@ -524,19 +576,53 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     const crownRadial: number[] = [];
     const crownSide: number[] = [];
     const crownRimAngle: number[] = [];
+    const crownCircle: number[] = [];
+    const crownLobeStrength: number[] = [];
+    const crownAngularDrift: number[] = [];
+    const crownEdgeNoise: number[] = [];
     const crownIndices: number[] = [];
     const crownRowSize = crownRings + 1;
     const crownSurfaceVertexCount = (crownSegments + 1) * crownRowSize;
+    const crownPeakValue = (
+      theta: number,
+      center: number,
+      width: number,
+      strength: number,
+    ) => {
+      const delta = Math.atan2(Math.sin(theta - center), Math.cos(theta - center));
+      return Math.exp(-((delta / width) ** 2)) * strength;
+    };
+    const crownLobeValue = (theta: number) => Math.min(1, Math.max(
+      crownPeakValue(theta, 0.38, 0.31, 0.82),
+      crownPeakValue(theta, 1.36, 0.37, 0.56),
+      crownPeakValue(theta, 2.58, 0.25, 1),
+      crownPeakValue(theta, 3.35, 0.3, 0.68),
+      crownPeakValue(theta, 4.68, 0.27, 0.91),
+      crownPeakValue(theta, 5.72, 0.4, 0.61),
+    ));
     for (let sideIndex = 0; sideIndex < 2; sideIndex += 1) {
       const side = sideIndex === 0 ? 1 : -1;
       for (let segment = 0; segment <= crownSegments; segment += 1) {
         const theta = (segment / crownSegments) * Math.PI * 2;
+        const circleX = Math.cos(theta);
+        const circleY = Math.sin(theta);
+        const lobeStrength = crownLobeValue(theta)
+          * (0.97 + Math.sin(theta * 11.3 + 0.8) * 0.03);
+        const angularDrift = Math.sin(theta * 3 + 0.7) * 0.042
+          + Math.sin(theta * 7 - 1.1) * 0.018;
+        const edgeNoise = 1
+          + 0.026 * Math.sin(theta * 9 + 0.8)
+          + 0.012 * Math.sin(theta * 17 - 1.1);
         for (let ring = 0; ring <= crownRings; ring += 1) {
           crownPositions.push(0, 0, 0);
           crownTheta.push(theta);
           crownRadial.push(ring / crownRings);
           crownSide.push(side);
           crownRimAngle.push(0);
+          crownCircle.push(circleX, circleY);
+          crownLobeStrength.push(lobeStrength);
+          crownAngularDrift.push(angularDrift);
+          crownEdgeNoise.push(edgeNoise);
         }
       }
     }
@@ -573,6 +659,19 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     crownGeometry.setAttribute('aRadial', new THREE.Float32BufferAttribute(crownRadial, 1));
     crownGeometry.setAttribute('aSide', new THREE.Float32BufferAttribute(crownSide, 1));
     crownGeometry.setAttribute('aRimAngle', new THREE.Float32BufferAttribute(crownRimAngle, 1));
+    crownGeometry.setAttribute('aCircle', new THREE.Float32BufferAttribute(crownCircle, 2));
+    crownGeometry.setAttribute(
+      'aLobeStrength',
+      new THREE.Float32BufferAttribute(crownLobeStrength, 1),
+    );
+    crownGeometry.setAttribute(
+      'aAngularDrift',
+      new THREE.Float32BufferAttribute(crownAngularDrift, 1),
+    );
+    crownGeometry.setAttribute(
+      'aEdgeNoise',
+      new THREE.Float32BufferAttribute(crownEdgeNoise, 1),
+    );
     crownGeometry.setIndex(crownIndices);
 
     const crownSurfaceGeometry = new THREE.BufferGeometry();
@@ -597,9 +696,29 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       'aRimAngle',
       new THREE.Float32BufferAttribute(crownRimAngle.slice(0, crownSurfaceVertexCount), 1),
     );
+    crownSurfaceGeometry.setAttribute(
+      'aCircle',
+      new THREE.Float32BufferAttribute(crownCircle.slice(0, crownSurfaceVertexCount * 2), 2),
+    );
+    crownSurfaceGeometry.setAttribute(
+      'aLobeStrength',
+      new THREE.Float32BufferAttribute(crownLobeStrength.slice(0, crownSurfaceVertexCount), 1),
+    );
+    crownSurfaceGeometry.setAttribute(
+      'aAngularDrift',
+      new THREE.Float32BufferAttribute(crownAngularDrift.slice(0, crownSurfaceVertexCount), 1),
+    );
+    crownSurfaceGeometry.setAttribute(
+      'aEdgeNoise',
+      new THREE.Float32BufferAttribute(crownEdgeNoise.slice(0, crownSurfaceVertexCount), 1),
+    );
     crownSurfaceGeometry.setIndex(
       crownIndices.slice(0, crownSegments * crownRings * 6),
     );
+    traceTiming('core-geometry-ready', {
+      vertices: crownSurfaceVertexCount,
+      triangles: crownSegments * crownRings * 2,
+    });
 
     const rimTubeSegments = 10;
     const rimPositions: number[] = [];
@@ -736,16 +855,27 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     };
     scene.add(splashBase);
 
-    const splashWave = new THREE.Mesh(crownSurfaceGeometry, waveMaterial);
+    const splashWave = new THREE.Mesh(crownSurfaceGeometry, coreWaveMaterial);
     splashWave.position.copy(splashBase.position);
     splashWave.frustumCulled = false;
     splashWave.renderOrder = 10;
     splashWave.visible = false;
     splashWave.onBeforeRender = () => {
       splashUniforms.uRimMode.value = 0;
-      waveMaterial.uniformsNeedUpdate = true;
+      coreWaveMaterial.uniformsNeedUpdate = true;
     };
     scene.add(splashWave);
+
+    const enhancedSplashWave = new THREE.Mesh(crownSurfaceGeometry, waveMaterial);
+    enhancedSplashWave.position.copy(splashWave.position);
+    enhancedSplashWave.frustumCulled = false;
+    enhancedSplashWave.renderOrder = 10;
+    enhancedSplashWave.visible = false;
+    enhancedSplashWave.onBeforeRender = () => {
+      splashUniforms.uRimMode.value = 0;
+      waveMaterial.uniformsNeedUpdate = true;
+    };
+    scene.add(enhancedSplashWave);
 
     const splashRim = new THREE.Mesh(rimGeometry, waveMaterial);
     splashRim.position.copy(splashWave.position);
@@ -793,7 +923,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     const frontDepthUniforms = createDepthUniforms();
     const backDepthUniforms = createDepthUniforms();
     const frontDepthMaterial = new THREE.RawShaderMaterial({
-      vertexShader: splashVertexShader,
+      vertexShader: splashCoreVertexShader,
       fragmentShader: thicknessFragmentShader,
       uniforms: frontDepthUniforms,
       glslVersion: THREE.GLSL3,
@@ -803,7 +933,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       side: THREE.FrontSide,
     });
     const backDepthMaterial = new THREE.RawShaderMaterial({
-      vertexShader: splashVertexShader,
+      vertexShader: splashCoreVertexShader,
       fragmentShader: thicknessFragmentShader,
       uniforms: backDepthUniforms,
       glslVersion: THREE.GLSL3,
@@ -846,7 +976,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uWaterLevel: { value: water.position.y - 0.02 },
     };
     const foamMaterial = new THREE.RawShaderMaterial({
-      vertexShader: splashVertexShader,
+      vertexShader: splashCoreVertexShader,
       fragmentShader: foamFragmentShader,
       uniforms: foamUniforms,
       glslVersion: THREE.GLSL3,
@@ -1041,14 +1171,31 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     let impactLogged = false;
     let secondaryImpactLogged = false;
     let completionNotified = false;
+    let splashCoreReady = false;
+    let splashCoreActive = false;
+    let enhancedSplashReady = false;
+    let enhancedSplashActive = false;
 
     const spawnSplash = (elapsed: number) => {
-      splashBase.visible = true;
-      splashWave.visible = true;
-      splashRim.visible = true;
-      splashLigaments.visible = true;
-      splashBeads.visible = true;
-      splashFoam.visible = true;
+      enhancedSplashActive = enhancedSplashReady;
+      splashCoreActive = !enhancedSplashActive && splashCoreReady;
+      host.dataset.impact = 'true';
+      host.dataset.splashCoreActive = String(splashCoreActive);
+      host.dataset.enhancedSplashActive = String(enhancedSplashActive);
+      traceTiming('impact', {
+        elapsed: Math.round(elapsed * 1000) / 1000,
+        coreReady: splashCoreReady,
+        coreActive: splashCoreActive,
+        enhancedReady: enhancedSplashReady,
+        enhancedActive: enhancedSplashActive,
+      });
+      splashBase.visible = enhancedSplashActive;
+      splashWave.visible = splashCoreActive;
+      enhancedSplashWave.visible = enhancedSplashActive;
+      splashRim.visible = enhancedSplashActive;
+      splashLigaments.visible = enhancedSplashActive;
+      splashBeads.visible = enhancedSplashActive;
+      splashFoam.visible = enhancedSplashActive;
       sprayParticles.visible = false;
       sprayAlphas.fill(0);
       sprayAlphaAttribute.needsUpdate = true;
@@ -1060,6 +1207,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       heightUniforms.uRippleAge2.value = -1;
       waveUniforms.uImpactStart.value = elapsed;
       impactTime = elapsed;
+      window.dispatchEvent(new CustomEvent('water:impact'));
       console.info(`${LOG} impact`, {
         elapsed,
         worldPosition: impactWorldPosition.toArray(),
@@ -1092,7 +1240,11 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       const pixelRatio = renderer.getPixelRatio();
       const renderWidth = Math.max(1, Math.floor(internalWidth * pixelRatio));
       const renderHeight = Math.max(1, Math.floor(internalHeight * pixelRatio));
-      sceneTarget.setSize(renderWidth, renderHeight);
+      const refractionScale = width < 768 ? 0.56 : 0.62;
+      sceneTarget.setSize(
+        Math.max(1, Math.floor(renderWidth * refractionScale)),
+        Math.max(1, Math.floor(renderHeight * refractionScale)),
+      );
       splashUniforms.uResolution.value.set(renderWidth, renderHeight);
       dropUniforms.uResolution.value.set(renderWidth, renderHeight);
       waterUniforms.uResolution.value.set(renderWidth, renderHeight);
@@ -1116,6 +1268,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
         );
         splashBase.position.copy(centeredSplashPosition);
         splashWave.position.copy(centeredSplashPosition);
+        enhancedSplashWave.position.copy(centeredSplashPosition);
         splashRim.position.copy(centeredSplashPosition);
         splashLigaments.position.copy(centeredSplashPosition);
         splashBeads.position.copy(centeredSplashPosition);
@@ -1151,11 +1304,43 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
 
     let animationFrame = 0;
     let startedAt = performance.now() / 1000;
+    let introStartedAt = startedAt;
     let lastRenderedAt = 0;
     let disposed = false;
     let firstFrame = true;
     let dropLaunchLogged = false;
+    let dropDrawLogged = false;
+    let splashDrawLogged = false;
     let revealNotified = false;
+    let introTimelineStarted = !playIntro;
+    const handleIntroSkip = () => {
+      if (!playIntro) return;
+      traceTiming('intro-skipped', {
+        coreReady: splashCoreReady,
+        timelineStarted: introTimelineStarted,
+        impacted: impactTime !== null,
+      });
+      playIntro = false;
+      introTimelineStarted = false;
+      revealNotified = true;
+      impactTime = null;
+      drop.visible = false;
+      splashBase.visible = false;
+      splashWave.visible = false;
+      enhancedSplashWave.visible = false;
+      splashRim.visible = false;
+      splashLigaments.visible = false;
+      splashBeads.visible = false;
+      splashFoam.visible = false;
+      sprayParticles.visible = false;
+      waterUniforms.uRevealProgress.value = 1;
+      waterUniforms.uDeepColor.value.copy(revealedDeepColor);
+      waterUniforms.uSurfaceColor.value.copy(revealedSurfaceColor);
+      heightUniforms.uRippleAge.value = -1;
+      heightUniforms.uRippleAge2.value = -1;
+      waterUniforms.uRippleAge.value = -1;
+    };
+    window.addEventListener('water:intro-skip', handleIntroSkip);
     let hasDecodedVideoFrame = Boolean(backgroundVideo && backgroundVideo.readyState >= 2);
     let pointerRippleIndex = 0;
     let lastPointerRippleAt = -Infinity;
@@ -1173,7 +1358,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
 
     const handlePointerMove = (event: PointerEvent) => {
       if (event.pointerType === 'touch' || host.dataset.sceneReady !== 'true') return;
-      if (intro && !revealNotified) return;
+      if (playIntro && !revealNotified) return;
 
       const now = performance.now() / 1000;
       if (now - lastPointerRippleAt < POINTER_RIPPLE_INTERVAL) return;
@@ -1288,6 +1473,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       if (now - lastRenderedAt < 1 / 30 - 0.001) return;
       lastRenderedAt = now;
       const elapsed = now - startedAt;
+      const introElapsed = now - introStartedAt;
 
       heightUniforms.uTime.value = elapsed;
       waterUniforms.uTime.value = elapsed;
@@ -1328,8 +1514,19 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       pointerSprayAlphaAttribute.needsUpdate = true;
       pointerSprayScaleAttribute.needsUpdate = true;
 
-      if (intro && elapsed >= DROP_DELAY && !dropLaunchLogged) {
+      if (playIntro && !introTimelineStarted && drop.visible) {
+        const idleOffset = Math.sin(elapsed * 2.1) * 0.055;
+        drop.position.y = DROP_START_Y + idleOffset;
+        drop.scale.setScalar(0.22 + Math.sin(elapsed * 1.7) * 0.004);
+      }
+
+      if (playIntro && introTimelineStarted && introElapsed >= DROP_DELAY && !dropLaunchLogged) {
         dropLaunchLogged = true;
+        host.dataset.dropLaunched = 'true';
+        traceTiming('drop-launched', {
+          introElapsed: Math.round(introElapsed * 1000) / 1000,
+          coreReady: splashCoreReady,
+        });
         const dropWasVisible = drop.visible;
         drop.visible = false;
         renderer.setRenderTarget(sceneTarget);
@@ -1339,10 +1536,10 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
         console.info(`${LOG} drop launched`, { delay: DROP_DELAY, duration: DROP_DURATION });
       }
 
-      if (intro && impactTime === null && elapsed >= DROP_DELAY) {
-        const progress = Math.min((elapsed - DROP_DELAY) / DROP_DURATION, 1);
+      if (playIntro && introTimelineStarted && impactTime === null && introElapsed >= DROP_DELAY) {
+        const progress = Math.min((introElapsed - DROP_DELAY) / DROP_DURATION, 1);
         const eased = progress * progress;
-        drop.position.y = THREE.MathUtils.lerp(5.5, 0.1, eased);
+        drop.position.y = THREE.MathUtils.lerp(DROP_START_Y, 0.1, eased);
         drop.scale.setScalar(THREE.MathUtils.lerp(0.23, 0.2, progress));
         if (progress >= 1) {
           drop.visible = false;
@@ -1353,8 +1550,11 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
         }
       }
 
-      if (intro && impactTime !== null) {
-        const impactAge = Math.max(elapsed - impactTime, 0);
+      if (playIntro && introTimelineStarted && impactTime !== null) {
+        const measuredImpactAge = Math.max(elapsed - impactTime, 0);
+        const impactAge = holdSplashForDiagnostics
+          ? Math.min(measuredImpactAge, 0.42)
+          : measuredImpactAge;
         heightUniforms.uRippleAge.value = impactAge;
         waterUniforms.uRippleAge.value = impactAge;
         const secondaryAge = impactAge - SECONDARY_IMPACT_DELAY;
@@ -1384,6 +1584,9 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
           .lerp(revealedSurfaceColor, revealProgress);
         if (!revealNotified && impactAge >= REVEAL_IMPACT_AGE) {
           revealNotified = true;
+          traceTiming('reveal-dispatched', {
+            impactAge: Math.round(impactAge * 1000) / 1000,
+          });
           window.dispatchEvent(new CustomEvent('water:reveal', {
             detail: {
               impactAge,
@@ -1392,14 +1595,17 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
           }));
           console.info(`${LOG} page reveal`, { impactAge });
         }
-        splashWave.visible = impactAge < 1.38;
-        splashBase.visible = splashWave.visible;
-        splashRim.visible = splashWave.visible;
-        splashLigaments.visible = splashWave.visible;
-        splashBeads.visible = splashWave.visible;
-        splashFoam.visible = impactAge < 1.3;
+        const splashAlive = impactAge < 1.38;
+        splashWave.visible = splashCoreActive && splashAlive;
+        enhancedSplashWave.visible = enhancedSplashActive && splashAlive;
+        splashBase.visible = enhancedSplashActive && splashAlive;
+        splashRim.visible = enhancedSplashActive && splashAlive;
+        splashLigaments.visible = enhancedSplashActive && splashAlive;
+        splashBeads.visible = enhancedSplashActive && splashAlive;
+        splashFoam.visible = enhancedSplashActive && impactAge < 1.3;
 
-        sprayParticles.visible = impactAge >= 0.04 && impactAge < 1.68;
+        sprayParticles.visible = enhancedSplashActive
+          && impactAge >= 0.04 && impactAge < 1.68;
         if (sprayParticles.visible) {
           const sprayFadeIn = THREE.MathUtils.smoothstep(impactAge, 0.04, 0.24);
           const sprayFadeOut = 1 - THREE.MathUtils.smoothstep(impactAge, 1.18, 1.68);
@@ -1481,9 +1687,35 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       renderer.setRenderTarget(null);
       renderer.render(scene, camera);
 
+      if (drop.visible && introTimelineStarted && !dropDrawLogged) {
+        dropDrawLogged = true;
+        traceTiming('drop-first-draw', {
+          calls: renderer.info.render.calls,
+          triangles: renderer.info.render.triangles,
+          y: Math.round(drop.position.y * 1000) / 1000,
+        });
+      }
+      if (
+        impactTime !== null
+        && (splashWave.visible || enhancedSplashWave.visible)
+        && !splashDrawLogged
+      ) {
+        splashDrawLogged = true;
+        traceTiming('splash-first-draw', {
+          calls: renderer.info.render.calls,
+          triangles: renderer.info.render.triangles,
+          age: Math.round(splashUniforms.uAge.value * 1000) / 1000,
+          mode: enhancedSplashWave.visible ? 'enhanced' : 'fallback',
+        });
+      }
+
       if (firstFrame) {
         firstFrame = false;
         host.dataset.firstFrame = 'true';
+        traceTiming('first-frame', {
+          canvasWidth: renderer.domElement.width,
+          canvasHeight: renderer.domElement.height,
+        });
         window.dispatchEvent(new CustomEvent('water:first-frame'));
         console.info(`${LOG} first frame rendered`, {
           canvas: [renderer.domElement.width, renderer.domElement.height],
@@ -1492,57 +1724,307 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
         console.groupEnd();
       }
     };
-    const warmupMeshes = [
-      drop,
+    const managedSplashMeshes = [
       splashBase,
       splashWave,
+      enhancedSplashWave,
       splashRim,
       splashLigaments,
       splashBeads,
       splashFoam,
       sprayParticles,
     ];
-    const warmUpAndStart = async () => {
-      warmupMeshes.forEach((mesh) => {
-        mesh.visible = true;
+    const enhancedSplashMeshes = [
+      enhancedSplashWave,
+      splashBase,
+      splashRim,
+      splashLigaments,
+      splashBeads,
+      splashFoam,
+      sprayParticles,
+    ];
+    const enhancedSplashWarmupStages = [
+      {
+        label: 'enhanced-surface',
+        meshes: [
+          enhancedSplashWave,
+          splashBase,
+          splashRim,
+          splashLigaments,
+          splashBeads,
+        ],
+      },
+      { label: 'enhanced-foam', meshes: [splashFoam] },
+      { label: 'enhanced-spray', meshes: [sprayParticles] },
+    ];
+    let enhancedWarmupWorker: Worker | null = null;
+    let enhancedRendererWarmupStarted = false;
+    let enhancedRendererWarmupScheduled = false;
+    let enhancedIdleHandle = 0;
+    let enhancedIdleUsesCallback = false;
+    const setWarmupVisibility = (stageMeshes: THREE.Object3D[]) => {
+      const previousVisibility = managedSplashMeshes.map((mesh) => mesh.visible);
+      managedSplashMeshes.forEach((mesh) => { mesh.visible = false; });
+      stageMeshes.forEach((mesh) => { mesh.visible = true; });
+      return () => {
+        managedSplashMeshes.forEach((mesh, index) => {
+          mesh.visible = previousVisibility[index];
+        });
+      };
+    };
+    const warmUpSplashStage = async (
+      label: string,
+      stageMeshes: THREE.Object3D[],
+    ) => {
+      if (disposed) return false;
+      traceTiming(`${label}-compile-submit-start`, {
+        meshCount: stageMeshes.length,
       });
+      let restoreVisibility = setWarmupVisibility(stageMeshes);
+      let compilation: Promise<unknown> | undefined;
       try {
-        await Promise.all([
-          renderer.compileAsync?.(waveSimulationScene, waveSimulationCamera)
-            ?? Promise.resolve(),
-          renderer.compileAsync?.(heightScene, heightCamera) ?? Promise.resolve(),
-          renderer.compileAsync?.(scene, camera) ?? Promise.resolve(),
-        ]);
-        const sceneTexture = splashUniforms.uSceneTexture.value;
-        splashUniforms.uSceneTexture.value = videoTexture;
-        const dropWasVisible = drop.visible;
-        drop.visible = false;
-        renderer.setRenderTarget(sceneTarget);
-        renderer.render(scene, camera);
-        drop.visible = dropWasVisible;
-        splashUniforms.uSceneTexture.value = sceneTexture;
+        if (parallelShaderCompile && renderer.compileAsync) {
+          compilation = renderer.compileAsync(scene, camera);
+        } else {
+          renderer.compile(scene, camera);
+        }
+        traceTiming(`${label}-compile-submitted`, {
+          asynchronous: Boolean(compilation),
+        });
       } catch (error) {
-        console.warn(`${LOG} shader warmup fell back to first render`, error);
+        console.warn(LOG + ' ' + label + ' shader warmup', error);
+        traceTiming(`${label}-compile-submit-failed`);
       } finally {
-        renderer.setRenderTarget(null);
+        restoreVisibility();
       }
-      warmupMeshes.forEach((mesh) => {
-        mesh.visible = false;
-      });
+
+      try {
+        await compilation;
+        traceTiming(`${label}-compile-complete`);
+      } catch (error) {
+        console.warn(LOG + ' ' + label + ' shader warmup', error);
+        traceTiming(`${label}-compile-failed`);
+      }
+
+      if (disposed) return false;
+      const previousRenderTarget = renderer.getRenderTarget();
+      restoreVisibility = setWarmupVisibility(stageMeshes);
+      try {
+        renderer.setRenderTarget(splashWarmupTarget);
+        renderer.clear();
+        renderer.render(scene, camera);
+        traceTiming(`${label}-pipeline-draw-complete`);
+      } catch (error) {
+        console.warn(LOG + ' ' + label + ' pipeline warmup', error);
+        return false;
+      } finally {
+        restoreVisibility();
+        renderer.setRenderTarget(previousRenderTarget);
+      }
+      return true;
+    };
+    const warmUpEnhancedSplash = async (
+      source: 'parallel' | 'worker-preheated' | 'deferred',
+    ) => {
+      if (disposed || enhancedRendererWarmupStarted) return;
+      enhancedRendererWarmupScheduled = false;
+      enhancedRendererWarmupStarted = true;
+      traceTiming('enhanced-warmup-start', { source });
+      if (source === 'parallel') {
+        enhancedSplashReady = await warmUpSplashStage('enhanced', enhancedSplashMeshes);
+      } else {
+        enhancedSplashReady = true;
+        for (const [index, stage] of enhancedSplashWarmupStages.entries()) {
+          if (disposed) return;
+          if (index > 0) {
+            await new Promise<void>((resolve) => {
+              if ('requestIdleCallback' in window) {
+                enhancedIdleUsesCallback = true;
+                enhancedIdleHandle = window.requestIdleCallback(
+                  () => {
+                    enhancedIdleHandle = 0;
+                    resolve();
+                  },
+                  { timeout: 1400 },
+                );
+              } else {
+                enhancedIdleUsesCallback = false;
+                enhancedIdleHandle = window.setTimeout(() => {
+                  enhancedIdleHandle = 0;
+                  resolve();
+                }, 120);
+              }
+            });
+          }
+          enhancedSplashReady = await warmUpSplashStage(stage.label, stage.meshes);
+          if (!enhancedSplashReady) break;
+        }
+      }
       if (disposed) return;
-      drop.visible = intro;
+      host.dataset.enhancedSplashReady = String(enhancedSplashReady);
+      traceTiming('enhanced-warmup-finished', {
+        source,
+        ready: enhancedSplashReady,
+      });
+    };
+    const scheduleEnhancedAfterReveal = (
+      source: 'worker-preheated' | 'deferred',
+    ) => {
+      if (enhancedRendererWarmupStarted || enhancedRendererWarmupScheduled) return;
+      enhancedRendererWarmupScheduled = true;
+      const schedule = () => {
+        if (disposed) return;
+        if ('requestIdleCallback' in window) {
+          enhancedIdleUsesCallback = true;
+          enhancedIdleHandle = window.requestIdleCallback(
+            () => {
+              enhancedIdleHandle = 0;
+              void warmUpEnhancedSplash(source);
+            },
+            { timeout: 1200 },
+          );
+        } else {
+          enhancedIdleUsesCallback = false;
+          enhancedIdleHandle = window.setTimeout(
+            () => {
+              enhancedIdleHandle = 0;
+              void warmUpEnhancedSplash(source);
+            },
+            120,
+          );
+        }
+      };
+      const homeStage = document.querySelector<HTMLElement>('[data-home-stage]');
+      if (homeStage?.dataset.revealState === 'ready') schedule();
+      else window.addEventListener('home:revealed', schedule, { once: true });
+    };
+    const startEnhancedSplashWarmup = () => {
+      if (disposed) return;
+      if (parallelShaderCompile) {
+        traceTiming('enhanced-parallel-path');
+        void warmUpEnhancedSplash('parallel');
+        return;
+      }
+      try {
+        enhancedWarmupWorker = new Worker(
+          new URL('./splashWarmup.worker.ts', import.meta.url),
+          { type: 'module' },
+        );
+        enhancedWarmupWorker.onmessage = (event: MessageEvent<{
+          ok: boolean;
+          parallel?: boolean;
+          durationMs: number;
+          error?: string;
+        }>) => {
+          traceTiming('enhanced-worker-finished', event.data);
+          enhancedWarmupWorker?.terminate();
+          enhancedWarmupWorker = null;
+          if (!event.data.ok) {
+            scheduleEnhancedAfterReveal('deferred');
+            return;
+          }
+          if (holdSplashForDiagnostics && !holdCoreSplashForDiagnostics) {
+            void warmUpEnhancedSplash('worker-preheated').then(() => {
+              if (!enhancedSplashReady || impactTime === null) return;
+              splashCoreActive = false;
+              enhancedSplashActive = true;
+              host.dataset.splashCoreActive = 'false';
+              host.dataset.enhancedSplashActive = 'true';
+              traceTiming('enhanced-diagnostic-activated');
+            });
+            return;
+          }
+          // A worker context can wake the driver/compiler, but it cannot prove that
+          // Three's program is cached for the main context. Never risk that compile
+          // on the drop timeline when parallel compilation is unavailable.
+          scheduleEnhancedAfterReveal('worker-preheated');
+        };
+        enhancedWarmupWorker.onerror = (event) => {
+          traceTiming('enhanced-worker-failed', { message: event.message });
+          enhancedWarmupWorker?.terminate();
+          enhancedWarmupWorker = null;
+          scheduleEnhancedAfterReveal('deferred');
+        };
+        enhancedWarmupWorker.postMessage({
+          programs: [
+            {
+              name: 'splash-surface',
+              vertex: splashVertexShader,
+              fragment: splashFragmentShader,
+            },
+            {
+              name: 'splash-foam',
+              vertex: splashCoreVertexShader,
+              fragment: foamFragmentShader,
+            },
+            {
+              name: 'splash-spray',
+              vertex: sprayVertexShader,
+              fragment: sprayFragmentShader,
+            },
+          ],
+        });
+        traceTiming('enhanced-worker-started');
+      } catch (error) {
+        enhancedWarmupWorker?.terminate();
+        enhancedWarmupWorker = null;
+        traceTiming('enhanced-worker-failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+        scheduleEnhancedAfterReveal('deferred');
+      }
+    };
+    const markSceneReady = () => {
+      if (disposed) return;
+      host.dataset.sceneReady = 'true';
+      window.dispatchEvent(new CustomEvent('water:ready'));
+    };
+    const startIntroTimeline = () => {
+      if (disposed) return;
+      introStartedAt = performance.now() / 1000;
+      introTimelineStarted = playIntro;
+      drop.visible = playIntro;
+      const dropNdc = drop.position.clone().project(camera);
+      host.dataset.introTimelineStarted = String(introTimelineStarted);
+      traceTiming('intro-timeline-started', {
+        playIntro,
+        coreReady: splashCoreReady,
+        dropNdc: dropNdc.toArray().map((value) => Math.round(value * 1000) / 1000),
+      });
+      if (playIntro) window.dispatchEvent(new CustomEvent('water:intro-start'));
+    };
+    const warmUpAndStart = () => {
+      managedSplashMeshes.forEach((mesh) => { mesh.visible = false; });
+      if (disposed) return;
+      drop.visible = playIntro;
+      if (playIntro) {
+        splashWave.visible = true;
+        coreWaveMaterial.colorWrite = false;
+      }
       startedAt = performance.now() / 1000;
       lastRenderedAt = 0;
       waveAccumulator = 0;
       waveLastElapsed = 0;
-      host.dataset.sceneReady = 'true';
-      window.dispatchEvent(new CustomEvent('water:ready'));
       render();
+      if (playIntro) {
+        splashWave.visible = false;
+        coreWaveMaterial.colorWrite = true;
+        splashCoreReady = true;
+        host.dataset.splashCoreReady = 'true';
+        traceTiming('core-first-frame-ready');
+      }
+      markSceneReady();
+      if (!playIntro) {
+        return;
+      }
+      startIntroTimeline();
+      startEnhancedSplashWarmup();
     };
-    void warmUpAndStart();
+    warmUpAndStart();
 
     const handleContextLost = (event: Event) => {
       event.preventDefault();
+      traceTiming('context-lost');
       console.error(`${LOG} WebGL context lost`);
     };
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
@@ -1551,13 +2033,22 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       console.info(`${LOG} disposing scene`);
       disposed = true;
       cancelAnimationFrame(animationFrame);
+      enhancedWarmupWorker?.terminate();
+      if (enhancedIdleHandle) {
+        if (enhancedIdleUsesCallback && 'cancelIdleCallback' in window) {
+          window.cancelIdleCallback(enhancedIdleHandle);
+        }
+        else window.clearTimeout(enhancedIdleHandle);
+      }
       resizeObserver.disconnect();
       backgroundVideo?.removeEventListener('loadedmetadata', syncVideoCover);
+      window.removeEventListener('water:intro-skip', handleIntroSkip);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       heightTarget.dispose();
       waveReadTarget.dispose();
       waveWriteTarget.dispose();
       sceneTarget.dispose();
+      splashWarmupTarget.dispose();
       frontDepthTarget.dispose();
       backDepthTarget.dispose();
       heightMaterial.dispose();
@@ -1573,6 +2064,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       rimGeometry.dispose();
       beadGeometry.dispose();
       ligamentGeometry.dispose();
+      coreWaveMaterial.dispose();
       waveMaterial.dispose();
       foamMaterial.dispose();
       frontDepthMaterial.dispose();
