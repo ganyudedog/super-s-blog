@@ -16,7 +16,7 @@ export const siteConfig = {
 
 // topbar配置
 export const navItems = [
-  { label: '首页', href: '/index' },
+  { label: '首页', href: '/index/' },
   { label: '笔记', href: '/notes' },
   { label: '随笔', href: '/essay' },
   { label: '关于', href: '/about' },
@@ -70,8 +70,8 @@ export const friendItems:FriendItem[] = [
 ];
 
 export const friendSiteInfo: FriendItem = {
-  href: '',
+  href: 'https://super-s-blog.pages.dev/',
   name: '甘雨的狗',
   description: '月相流转之间，我以我为锚点。',
-  avatar: '/image/favicon.ico',
+  avatar: 'https://super-s-blog.pages.dev/image/favicon.ico',
 };

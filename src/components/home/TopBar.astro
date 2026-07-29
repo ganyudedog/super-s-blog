@@ -7,8 +7,8 @@ interface Props {
 
 const { revealed = false } = Astro.props;
 const pathname = Astro.url.pathname;
-const isActive = (href: string) => href === '/index'
-  ? pathname === '/' || pathname === '/index' || pathname === '/index'
+const isActive = (href: string) => href === '/index/'
+  ? pathname === '/' || pathname === '/index' || pathname === '/index/'
   : pathname.startsWith(href);
 const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hover:bg-white/10 hover:text-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-200';
 ---
@@ -22,7 +22,7 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
   transition:name="site-top-bar"
   transition:persist
 >
-  <a class="brand flex w-fit items-center gap-2.5" href="/index" aria-label="返回首页">
+  <a class="brand flex w-fit items-center gap-2.5" href="/index/" aria-label="返回首页">
     <span class="brand-mark size-9 place-items-center rounded-full border border-cyan-200/35 overflow-hidden" aria-hidden="true">
       <img class="w-full hover:contrast-125" src="/image/topbar.jpg" alt="丛雨可爱捏">
     </span>

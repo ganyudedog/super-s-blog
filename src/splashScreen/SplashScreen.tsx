@@ -35,7 +35,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
     const redirectFromIntro = () => {
       if (!intro || window.location.pathname !== '/') return;
       const search = import.meta.env.DEV ? window.location.search : '';
-      window.location.replace(`/index${search}`);
+      window.location.replace(`/index/${search}`);
     };
     let nextProfile: WaterCompatibilityProfile;
     try {

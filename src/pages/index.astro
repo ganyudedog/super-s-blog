@@ -12,7 +12,7 @@ import HomeView from '../components/home/HomeView.astro';
 
 	window.addEventListener('home:revealed', () => {
 		if (window.location.pathname === '/') {
-			window.history.replaceState(window.history.state, '', '/index');
+			window.history.replaceState(window.history.state, '', '/index/');
 		}
 	}, { once: true });
 	initHomeReveal();
