@@ -17,8 +17,9 @@ function clamp(value: number, minimum: number, maximum: number) {
 }
 
 function projectVideoPoint(video: HTMLVideoElement, x: number, y: number) {
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
+  const videoBounds = video.getBoundingClientRect();
+  const viewportWidth = videoBounds.width || window.innerWidth;
+  const viewportHeight = videoBounds.height || window.innerHeight;
   const videoWidth = video.videoWidth || 1920;
   const videoHeight = video.videoHeight || 1080;
   const scale = Math.max(viewportWidth / videoWidth, viewportHeight / videoHeight);
@@ -31,6 +32,36 @@ function projectVideoPoint(video: HTMLVideoElement, x: number, y: number) {
     x: offsetX + x * displayWidth,
     y: offsetY + y * displayHeight,
   };
+}
+
+function waitForDecodedVideoFrame(video: HTMLVideoElement, timeoutMs: number) {
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (ready: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      video.removeEventListener('loadeddata', handleReady);
+      video.removeEventListener('playing', handleReady);
+      resolve(ready);
+    };
+    const handleReady = () => {
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth <= 0) return;
+      if ('requestVideoFrameCallback' in video) {
+        video.requestVideoFrameCallback(() => finish(true));
+      } else {
+        finish(true);
+      }
+    };
+    const timeout = window.setTimeout(() => finish(false), timeoutMs);
+    video.addEventListener('loadeddata', handleReady);
+    video.addEventListener('playing', handleReady);
+    handleReady();
+  });
 }
 
 export function initHomeReveal() {
@@ -96,14 +127,20 @@ export function initHomeReveal() {
     traceReveal('finished');
   };
 
-  const startReveal = (detail: WaterRevealDetail = {}) => {
+  const startReveal = async (detail: WaterRevealDetail = {}) => {
     if (revealed) return;
     revealed = true;
+    stage.dataset.revealState = 'waiting-video';
+    if (video) {
+      void video.play().catch(() => undefined);
+      const mobile = window.matchMedia('(max-width: 767px)').matches;
+      const videoFrameReady = await waitForDecodedVideoFrame(video, mobile ? 1600 : 900);
+      stage.dataset.videoFrameReady = String(videoFrameReady);
+    }
     stage.dataset.revealState = 'running';
     stage.dataset.videoRevealState = 'running';
     stage.style.setProperty('--scene-light-x', `${detail.light?.x ?? 0}%`);
     stage.style.setProperty('--scene-light-y', `${detail.light?.y ?? 0}%`);
-    if (video) void video.play().catch(() => undefined);
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const nightBackdrop = document.querySelector<HTMLElement>('[data-water-night]');
@@ -210,7 +247,7 @@ export function initHomeReveal() {
   const onWaterReveal = (event: Event) => {
     window.clearTimeout(sceneFallback);
     traceReveal('water-reveal-received');
-    startReveal((event as CustomEvent<WaterRevealDetail>).detail);
+    void startReveal((event as CustomEvent<WaterRevealDetail>).detail);
   };
   window.addEventListener('water:reveal', onWaterReveal, { once: true });
 
@@ -218,7 +255,7 @@ export function initHomeReveal() {
     traceReveal('fallback-fired');
     stage.dataset.waterIntroSkipped = 'true';
     window.dispatchEvent(new CustomEvent('water:intro-skip'));
-    startReveal();
+    void startReveal();
   };
   const armSceneFallback = () => {
     window.clearTimeout(sceneFallback);

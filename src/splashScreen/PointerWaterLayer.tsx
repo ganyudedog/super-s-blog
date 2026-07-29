@@ -92,7 +92,7 @@ export default function PointerWaterLayer() {
       position: 'fixed',
       inset: '0',
       width: '100vw',
-      height: '100vh',
+      height: CSS.supports('height: 100lvh') ? '100lvh' : '100vh',
       pointerEvents: 'none',
       zIndex: '2147483000',
     });
@@ -107,7 +107,10 @@ export default function PointerWaterLayer() {
     };
     canvas.addEventListener('webglcontextlost', handleContextLost);
 
-    const viewportSize = new THREE.Vector2(window.innerWidth, window.innerHeight);
+    const viewportSize = new THREE.Vector2(
+      Math.max(canvas.clientWidth, 1),
+      Math.max(canvas.clientHeight, 1),
+    );
     renderer.setSize(viewportSize.x, viewportSize.y, false);
     let simulationDimensions = getSimulationDimensions(
       viewportSize.x,
@@ -314,8 +317,8 @@ export default function PointerWaterLayer() {
     };
 
     const handleResize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      const width = Math.max(canvas.clientWidth, 1);
+      const height = Math.max(canvas.clientHeight, 1);
       if (viewportSize.x === width && viewportSize.y === height) return;
       viewportSize.set(width, height);
       renderer.setSize(viewportSize.x, viewportSize.y, false);

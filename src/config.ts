@@ -70,8 +70,8 @@ export const friendItems:FriendItem[] = [
 ];
 
 export const friendSiteInfo: FriendItem = {
-  href: 'https://super-s-blog.pages.dev/',
   name: '甘雨的狗',
   description: '月相流转之间，我以我为锚点。',
+  href: 'https://super-s-blog.pages.dev/',
   avatar: 'https://super-s-blog.pages.dev/image/favicon.ico',
 };

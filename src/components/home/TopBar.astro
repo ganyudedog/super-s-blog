@@ -15,14 +15,14 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
 
 <header
   class:list={[
-    'top-bar fixed inset-x-3 top-3 z-30 mx-auto grid min-h-14 max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:inset-x-4 md:px-4',
+    'top-bar fixed inset-x-3 top-3 z-30 mx-auto grid min-h-14 max-w-[1280px] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:inset-x-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4 md:px-4',
     revealed ? 'opacity-100' : 'opacity-0',
   ]}
   data-reveal-top
   transition:name="site-top-bar"
   transition:persist
 >
-  <a class="brand flex w-fit items-center gap-2.5" href="/index/" aria-label="返回首页">
+  <a class="brand col-start-2 row-start-1 flex w-fit max-w-full flex-row-reverse items-center gap-2.5 justify-self-end text-right md:col-start-1 md:flex-row md:justify-self-start md:text-left" href="/index/" aria-label="返回首页">
     <span class="brand-mark size-9 place-items-center rounded-full border border-cyan-200/35 overflow-hidden" aria-hidden="true">
       <img class="w-full hover:contrast-125" src="/image/topbar.jpg" alt="丛雨可爱捏">
     </span>
@@ -32,7 +32,7 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     </span>
   </a>
 
-  <nav class="primary-nav flex items-center justify-center gap-1" aria-label="主导航">
+  <nav class="primary-nav hidden items-center justify-center gap-1 md:flex" aria-label="主导航" data-site-nav>
     {navItems.map((item) => (
       <a
         class:list={[navLinkClass, isActive(item.href) ? 'bg-white/10 text-cyan-100' : 'text-slate-300']}
@@ -44,12 +44,60 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     ))}
   </nav>
 
-  <button class="nav-menu-button grid size-10 place-items-center justify-self-end gap-1 rounded-md border border-white/15 bg-black/25 p-2 text-slate-200 md:hidden" type="button" aria-label="打开导航菜单" aria-expanded="false">
+  <button class="nav-menu-button col-start-1 row-start-1 grid size-10 place-items-center justify-self-start gap-1 rounded-md border border-white/20 bg-black/25 p-2 text-slate-100 md:hidden" type="button" aria-label="打开导航菜单" aria-controls="mobile-site-nav" aria-expanded="false">
     <span></span>
     <span></span>
     <span></span>
   </button>
 </header>
+
+<button
+  class="mobile-nav-backdrop md:hidden"
+  type="button"
+  aria-label="关闭导航菜单"
+  tabindex="-1"
+  data-mobile-nav-backdrop
+></button>
+
+<aside
+  id="mobile-site-nav"
+  class="mobile-nav-drawer md:hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-label="站点导航"
+  aria-hidden="true"
+  data-mobile-nav-drawer
+>
+  <header class="flex items-center justify-between border-b border-white/15 px-5 py-4">
+    <div>
+      <p class="m-0 text-[0.62rem] font-extrabold text-cyan-200/80">NAVIGATION</p>
+      <h2 class="m-0 mt-1 text-lg font-semibold text-white">页面导航</h2>
+    </div>
+    <button
+      class="mobile-nav-close grid size-10 place-items-center rounded-md border border-white/20 bg-white/[0.06] text-2xl leading-none text-slate-100"
+      type="button"
+      aria-label="关闭导航菜单"
+      data-mobile-nav-close
+    >
+      <span aria-hidden="true">×</span>
+    </button>
+  </header>
+  <nav class="grid px-3 py-3" aria-label="移动端主导航" data-site-nav>
+    {navItems.map((item, index) => (
+      <a
+        class:list={[
+          'mobile-nav-link flex min-h-12 items-center justify-between border-b border-white/10 px-3 py-3 text-base font-semibold transition last:border-b-0',
+          isActive(item.href) ? 'bg-white/10 text-cyan-50' : 'text-slate-100',
+        ]}
+        href={item.href}
+        aria-current={isActive(item.href) ? 'page' : undefined}
+      >
+        <span>{item.label}</span>
+        <span class="font-mono text-[0.65rem] text-cyan-100/55" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+      </a>
+    ))}
+  </nav>
+</aside>
 
 <script>
   const normalizePath = (pathname: string) => {
@@ -57,9 +105,9 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     return normalized || '/';
   };
 
-  const updateActiveLinks = (topBar: HTMLElement) => {
+  const updateActiveLinks = () => {
     const currentPath = normalizePath(window.location.pathname);
-    topBar.querySelectorAll<HTMLAnchorElement>('nav a').forEach((link) => {
+    document.querySelectorAll<HTMLAnchorElement>('[data-site-nav] a').forEach((link) => {
       const linkPath = normalizePath(new URL(link.href, window.location.href).pathname);
       const active = linkPath === '/index'
         ? currentPath === '/' || currentPath === '/index'
@@ -75,23 +123,30 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
 
   const bindTopBars = () => {
     document.querySelectorAll<HTMLElement>('.top-bar').forEach((topBar) => {
-      updateActiveLinks(topBar);
+      updateActiveLinks();
       if (topBar.dataset.menuBound === 'true') return;
       topBar.dataset.menuBound = 'true';
       const button = topBar.querySelector<HTMLButtonElement>('.nav-menu-button');
-      const closeMenu = () => {
-        topBar.classList.remove('is-menu-open');
-        button?.setAttribute('aria-expanded', 'false');
+      const drawer = document.querySelector<HTMLElement>('[data-mobile-nav-drawer]');
+      const backdrop = document.querySelector<HTMLButtonElement>('[data-mobile-nav-backdrop]');
+      const closeButton = drawer?.querySelector<HTMLButtonElement>('[data-mobile-nav-close]');
+      const setMenuOpen = (open: boolean, returnFocus = false) => {
+        topBar.classList.toggle('is-menu-open', open);
+        document.documentElement.classList.toggle('nav-drawer-open', open);
+        button?.setAttribute('aria-expanded', String(open));
+        drawer?.setAttribute('aria-hidden', String(!open));
+        if (open) window.setTimeout(() => closeButton?.focus(), 180);
+        else if (returnFocus) button?.focus();
       };
       button?.addEventListener('click', () => {
-        const open = topBar.classList.toggle('is-menu-open');
-        button.setAttribute('aria-expanded', String(open));
+        setMenuOpen(!topBar.classList.contains('is-menu-open'));
       });
-      topBar.querySelectorAll('nav a').forEach((link) => link.addEventListener('click', closeMenu));
+      backdrop?.addEventListener('click', () => setMenuOpen(false));
+      closeButton?.addEventListener('click', () => setMenuOpen(false, true));
+      drawer?.querySelectorAll('nav a').forEach((link) => link.addEventListener('click', () => setMenuOpen(false)));
       document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape' || !topBar.classList.contains('is-menu-open')) return;
-        closeMenu();
-        button?.focus();
+        setMenuOpen(false, true);
       });
     });
   };

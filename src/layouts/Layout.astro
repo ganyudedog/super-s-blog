@@ -36,7 +36,7 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 		<meta name="theme-color" content="#050911" />
 		<style is:inline>
 			html, body { margin: 0; min-height: 100%; background: #071421; }
-			.home-stage { min-height: 100dvh; background: #050911; }
+			.home-stage { min-height: 100svh; background: #050911; }
 			.home-boot-surface {
 				position: fixed;
 				inset: 0;
@@ -116,6 +116,8 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 					gsap.killTweensOf(topBar);
 					if (shouldHide) {
 						topBar.classList.remove('is-menu-open');
+						document.documentElement.classList.remove('nav-drawer-open');
+						document.querySelector<HTMLElement>('[data-mobile-nav-drawer]')?.setAttribute('aria-hidden', 'true');
 						topBar.querySelector<HTMLButtonElement>('.nav-menu-button')?.setAttribute('aria-expanded', 'false');
 						button.dataset.visible = 'false';
 						gsap.to(topBar, {
