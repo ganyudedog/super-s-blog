@@ -1,4 +1,6 @@
 ---
+import { siteConfig } from '../../config';
+
 interface Props {
   postCount: number;
   noteCount: number;
@@ -7,11 +9,34 @@ interface Props {
 }
 
 const { postCount, noteCount, tagCount, revealed = false } = Astro.props;
+
+const DAY_IN_MS = 86_400_000;
+
+function getBeijingDaySerial(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return Date.UTC(value('year'), value('month') - 1, value('day'));
+}
+
+function getRunningDays(publishTime: string) {
+  const [year, month, day] = publishTime.split('-').map(Number);
+  const publishDay = Date.UTC(year, month - 1, day);
+  return Math.max(1, Math.floor((getBeijingDaySerial() - publishDay) / DAY_IN_MS) + 1);
+}
+
+const runningDays = getRunningDays(siteConfig.publishTime);
 ---
 
 <aside
   class:list={[
-    'glass-panel stats-panel order-2 p-4 md:col-start-1 md:row-start-2 md:p-5 xl:col-start-3 xl:row-start-1',
+    'glass-panel stats-panel order-2 hidden p-4 md:col-start-1 md:row-start-2 md:block md:p-5 xl:col-start-3 xl:row-start-1',
     revealed ? 'opacity-100' : 'opacity-0',
   ]}
   data-reveal-right
@@ -44,6 +69,40 @@ const { postCount, noteCount, tagCount, revealed = false } = Astro.props;
 
   <div class="mt-3 text-[0.68rem] text-slate-400">
     <span class="block">持续运行</span>
-    <strong class="mt-1 block text-xs text-amber-200/80">733 days</strong>
+    <strong
+      class="mt-1 block text-xs text-amber-200/80"
+      data-running-days
+      data-publish-time={siteConfig.publishTime}
+    >{runningDays} days</strong>
   </div>
 </aside>
+
+<script>
+  const DAY_IN_MS = 86_400_000;
+
+  const getBeijingDaySerial = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(new Date());
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value);
+
+    return Date.UTC(value('year'), value('month') - 1, value('day'));
+  };
+
+  const updateRunningDays = () => {
+    document.querySelectorAll<HTMLElement>('[data-running-days]').forEach((element) => {
+      const [year, month, day] = (element.dataset.publishTime ?? '').split('-').map(Number);
+      if (![year, month, day].every(Number.isFinite)) return;
+      const publishDay = Date.UTC(year, month - 1, day);
+      const runningDays = Math.max(1, Math.floor((getBeijingDaySerial() - publishDay) / DAY_IN_MS) + 1);
+      element.textContent = `${runningDays} days`;
+    });
+  };
+
+  updateRunningDays();
+  document.addEventListener('astro:page-load', updateRunningDays);
+</script>

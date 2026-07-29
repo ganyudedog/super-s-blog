@@ -12,6 +12,7 @@ export const siteConfig = {
     github: 'https://github.com/ganyudedog',
     email: '2655314552@qq.com',
   },
+  publishTime: '2026-07-29'
 } as const;
 
 // topbar配置

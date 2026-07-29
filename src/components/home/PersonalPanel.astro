@@ -10,7 +10,7 @@ const { revealed = false } = Astro.props;
 
 <aside
   class:list={[
-    'glass-panel personal-panel order-1 p-4 md:col-start-1 md:row-start-1 md:p-5 xl:row-span-2',
+    'glass-panel personal-panel order-1 hidden p-4 md:col-start-1 md:row-start-1 md:block md:p-5 xl:row-span-2',
     revealed ? 'opacity-100' : 'opacity-0',
   ]}
   data-reveal-left
