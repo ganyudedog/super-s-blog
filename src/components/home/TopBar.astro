@@ -23,7 +23,9 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
   transition:persist
 >
   <a class="brand flex w-fit items-center gap-2.5" href="/index" aria-label="返回首页">
-    <span class="brand-mark grid size-9 place-items-center rounded-full border border-cyan-200/35 bg-slate-950/70 text-sm font-extrabold text-cyan-200" aria-hidden="true">S</span>
+    <span class="brand-mark size-9 place-items-center rounded-full border border-cyan-200/35 overflow-hidden" aria-hidden="true">
+      <img class="w-full hover:contrast-125" src="/image/topbar.jpg" alt="丛雨可爱捏">
+    </span>
     <span class="min-w-0">
       <strong class="block text-[0.9rem] font-semibold tracking-normal">{siteConfig.title}</strong>
       <small class="mt-0.5 block text-[0.64rem] text-slate-400">{siteConfig.subtitle}</small>

@@ -24,38 +24,83 @@ const { posts, revealed = false } = Astro.props;
     class="route-item mb-6 overflow-hidden rounded-lg border border-white/15 p-5 md:p-6"
     aria-labelledby="about-this-place-title"
   >
-    <header class="grid grid-cols-4 border-b border-white/10">
-      <div class="col-span-1">
+    <header class="grid grid-cols-1 gap-4 border-b border-white/10 pb-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.8fr)_minmax(0,1fr)] sm:items-start sm:gap-3">
+      <div>
         <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-emerald-200/85">ABOUT THIS PLACE</p>
         <h2 id="about-this-place-title" class="m-0 flex items-center gap-2 text-xl font-semibold text-slate-100 md:text-2xl">
           <span aria-hidden="true">🍃</span>
           <span>关于此间</span>
         </h2>
       </div>
-      <div class="col-span-2 text-center">
-        <p class="m-0 text-base text-cyan-50 md:text-lg">
-          <strong>月相流转之间，我以我为锚点</strong>
-        </p>
+      <div class="min-w-0 text-center sm:px-2">
+        <svg
+          class="mx-auto block h-auto w-full max-w-[38rem] overflow-visible"
+          viewBox="0 0 600 92"
+          role="img"
+          aria-labelledby="route-moon-title"
+        >
+          <title id="route-moon-title">月相流转之间，我以我为锚点</title>
+          <defs>
+            <linearGradient id="route-moon-text" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffffff" />
+              <stop offset="0.52" stop-color="#e9f7ff" />
+              <stop offset="1" stop-color="#b9dff2" />
+            </linearGradient>
+            <linearGradient id="route-moon-beam" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#bde9ff" stop-opacity="0" />
+              <stop offset="0.5" stop-color="#e8f7ff" stop-opacity="0.72" />
+              <stop offset="1" stop-color="#bde9ff" stop-opacity="0" />
+            </linearGradient>
+            <filter id="route-moon-glow" x="-25%" y="-80%" width="150%" height="260%" color-interpolation-filters="sRGB">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1.4" result="glow-near" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="glow-mid" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation="13" result="glow-far" />
+              <feColorMatrix
+                in="glow-far"
+                type="matrix"
+                values="0.72 0 0 0 0.12  0 0.9 0 0 0.18  0 0 1.18 0 0.28  0 0 0 0.72 0"
+                result="glow-cold"
+              />
+              <feMerge>
+                <feMergeNode in="glow-cold" />
+                <feMergeNode in="glow-mid" />
+                <feMergeNode in="glow-near" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path d="M72 72H528" stroke="url(#route-moon-beam)" stroke-width="1" opacity="0.42" />
+          <text
+            x="300"
+            y="55"
+            text-anchor="middle"
+            fill="url(#route-moon-text)"
+            filter="url(#route-moon-glow)"
+            font-family="'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif"
+            font-size="38"
+            font-weight="700"
+          >月相流转之间，我以我为锚点</text>
+        </svg>
         <p
-          class="mx-auto mb-0 mt-2 max-w-[42rem] break-words text-sm leading-6 text-cyan-100/70 sm:text-base sm:leading-7"
+          class="mx-auto mb-0 mt-1 max-w-[42rem] break-words text-sm leading-6 text-cyan-100/70 sm:text-base sm:leading-7"
           lang="en"
           style="font-family: 'Cambria Math', 'STIX Two Math', 'Times New Roman', serif;"
         >
           𝖀𝖓𝖉𝖊𝖗 𝖙𝖍𝖊 𝖋𝖑𝖔𝖜𝖎𝖓𝖌 𝖒𝖔𝖔𝖓𝖑𝖎𝖌𝖍𝖙, 𝕴 𝖆𝖓𝖈𝖍𝖔𝖗 𝖒𝖞𝖘𝖊𝖑𝖋
         </p>
       </div>
-      <div class="float-right col-span-1 mt-1 text-cyan-100/60 text-right">
+      <div class="mt-1 hidden w-full justify-self-end text-cyan-100/60 text-right sm:block">
         <svg
-          class="translate-x-5 transition-[color,filter] duration-200 ease-out hover:text-cyan-50 hover:contrast-150 hover:brightness-125"
-          viewBox="0 0 128 32"
+          class="h-auto w-full transition-[color,filter] duration-200 ease-out hover:text-cyan-50 hover:contrast-150 hover:brightness-125"
+          viewBox="0 0 128 44"
           fill="none"
           aria-hidden="true"
           >
-            <path d="M4 16C24 7 41 7 64 16C87 25 104 25 124 16" stroke="currentColor" stroke-width="1" opacity="0.28" />
-            <path d="M18 8A8 8 0 1 0 18 24A6 8 0 0 1 18 8Z" fill="currentColor" opacity="0.55" />
-            <circle cx="64" cy="16" r="8" fill="currentColor" opacity="0.9" />
-            <path d="M110 8A8 8 0 1 1 110 24A6 8 0 0 0 110 8Z" fill="currentColor" opacity="0.55" />
-            <circle cx="64" cy="16" r="11" stroke="currentColor" stroke-width="0.75" opacity="0.2" />
+            <path d="M3 22C23 10 41 10 64 22C87 34 105 34 125 22" stroke="currentColor" stroke-width="1" opacity="0.34" />
+            <path d="M18 10A12 12 0 1 0 18 34A9 12 0 0 1 18 10Z" fill="currentColor" opacity="0.68" />
+            <circle cx="64" cy="22" r="11.5" fill="currentColor" opacity="0.95" />
+            <path d="M110 10A12 12 0 1 1 110 34A9 12 0 0 0 110 10Z" fill="currentColor" opacity="0.68" />
+            <circle cx="64" cy="22" r="16" stroke="currentColor" stroke-width="0.85" opacity="0.26" />
           </svg> 
       </div>
     </header>

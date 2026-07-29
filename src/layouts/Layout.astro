@@ -95,6 +95,7 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 		</div>
 		<script>
 			import { gsap } from 'gsap';
+			import { swapFunctions } from 'astro:transitions/client';
 
 			const bindScrollChrome = () => {
 				const button = document.querySelector<HTMLButtonElement>('[data-back-to-top]');
@@ -183,14 +184,11 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 				void event.viewTransition.updateCallbackDone.catch(() => undefined);
 				event.viewTransition.skipTransition();
 
-				const nextTitle = event.newDocument.title;
-				const nextDescription = event.newDocument.querySelector<HTMLMetaElement>('meta[name="description"]')?.content;
 				event.swap = () => {
+					swapFunctions.deselectScripts(event.newDocument);
+					swapFunctions.swapRootAttributes(event.newDocument);
+					swapFunctions.swapHeadElements(event.newDocument);
 					currentRoute.replaceWith(nextRoute);
-					document.title = nextTitle;
-					if (nextDescription) {
-						document.querySelector<HTMLMetaElement>('meta[name="description"]')?.setAttribute('content', nextDescription);
-					}
 				};
 			});
 
