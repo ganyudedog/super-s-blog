@@ -101,11 +101,20 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       waterFragment: waterFragmentShader.length,
     });
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+    } catch (error) {
+      console.error(`${LOG} renderer creation failed`, error);
+      window.dispatchEvent(new CustomEvent('water:compatibility-fallback', {
+        detail: { scope: 'all' },
+      }));
+      return undefined;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2026,6 +2035,9 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       event.preventDefault();
       traceTiming('context-lost');
       console.error(`${LOG} WebGL context lost`);
+      window.dispatchEvent(new CustomEvent('water:compatibility-fallback', {
+        detail: { scope: 'all' },
+      }));
     };
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
 

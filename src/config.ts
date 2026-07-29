@@ -30,8 +30,9 @@ export interface FriendItem {
 
 export const friendItems:FriendItem[] = [] ;
 
-export const friendSiteInfo = {
+export const friendSiteInfo: FriendItem = {
+  href: '',
   name: siteConfig.title,
   description: '月相流转之间，我以我为锚点。',
   avatar: '/image/favicon.ico',
-} as const;
+};

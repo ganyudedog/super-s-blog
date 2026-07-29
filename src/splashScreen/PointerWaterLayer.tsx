@@ -66,12 +66,21 @@ export default function PointerWaterLayer() {
     const activeCanvas = document.querySelector<HTMLCanvasElement>('canvas[data-pointer-water-layer="true"]');
     if (activeCanvas?.isConnected) return undefined;
 
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: false,
-      powerPreference: 'default',
-      premultipliedAlpha: true,
-    });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: false,
+        powerPreference: 'default',
+        premultipliedAlpha: true,
+      });
+    } catch (error) {
+      console.error('[PointerWaterLayer] renderer creation failed', error);
+      window.dispatchEvent(new CustomEvent('water:compatibility-fallback', {
+        detail: { scope: 'pointer' },
+      }));
+      return undefined;
+    }
     renderer.setPixelRatio(1);
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -88,6 +97,15 @@ export default function PointerWaterLayer() {
       zIndex: '2147483000',
     });
     document.body.appendChild(canvas);
+
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      console.error('[PointerWaterLayer] WebGL context lost');
+      window.dispatchEvent(new CustomEvent('water:compatibility-fallback', {
+        detail: { scope: 'pointer' },
+      }));
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost);
 
     const viewportSize = new THREE.Vector2(window.innerWidth, window.innerHeight);
     renderer.setSize(viewportSize.x, viewportSize.y, false);
@@ -348,6 +366,7 @@ export default function PointerWaterLayer() {
       quadGeometry.dispose();
       simulationMaterial.dispose();
       surfaceMaterial.dispose();
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();
