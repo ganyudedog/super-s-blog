@@ -18,6 +18,7 @@ in float vRadial;
 in float vTheta;
 in float vLobeStrength;
 in float vShellThickness;
+in float vSide;
 
 out vec4 outColor;
 
@@ -68,6 +69,7 @@ void main() {
     clamp(refractedUv + screenTangent * 0.0018, vec2(0.003), vec2(0.997))
   ).rgb;
   vec3 background = mix(backgroundSharp, backgroundSoft, opticalDepth * 0.22);
+  float interiorLayer = smoothstep(0.2, -0.2, vSide);
 
   float edge = smoothstep(0.62, 1.0, vRadial);
   float heightGradient = smoothstep(uWaterLevel, uWaterLevel + 0.82, vWorldPosition.y);
@@ -77,6 +79,8 @@ void main() {
   vec3 color = background * transmittance
     + waterTint * (1.0 - transmittance) * 0.68;
   color += uTipWaterColor * opticalDepth * 0.055;
+  vec3 interiorTransmission = mix(background, waterTint, 0.16 + opticalDepth * 0.12);
+  color = mix(color, interiorTransmission + uTipWaterColor * 0.045, interiorLayer * 0.42);
 
   float halfLight = max(dot(normal, halfDirection), 0.0);
   float spec2 = halfLight * halfLight;
@@ -131,5 +135,6 @@ void main() {
     + aeratedRim * 0.14
     + capillaryEdge * 0.09
     + rootMeniscus * 0.045;
+  coverage *= mix(1.0, 0.26, interiorLayer);
   outColor = vec4(color, clamp(coverage * lifeFade, 0.0, 0.94));
 }

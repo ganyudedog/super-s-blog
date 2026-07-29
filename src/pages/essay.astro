@@ -7,7 +7,7 @@ const essays = (await getCollection('posts', ({ data }) => !data.draft && data.c
   .sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
 ---
 
-<ContentLayout title="随笔" description="书页、日常与偶然浮现的思绪。">
+<ContentLayout title="随笔" description="书页、日常与偶然浮现的思绪">
   <header class="mb-5 px-1 text-slate-100">
     <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-emerald-200/85">ESSAYS</p>
     <h1 class="m-0 text-3xl font-semibold">随笔</h1>

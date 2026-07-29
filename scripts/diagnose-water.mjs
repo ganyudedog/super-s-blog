@@ -6,6 +6,7 @@ const targetUrl = process.env.WATER_DIAGNOSTIC_URL ?? 'http://localhost:4321/';
 const observationMs = Number(process.env.WATER_DIAGNOSTIC_MS ?? 15000);
 const captureFrames = process.env.WATER_DIAGNOSTIC_CAPTURE === '1';
 const captureSplash = process.env.WATER_DIAGNOSTIC_CAPTURE_SPLASH === '1';
+const reloadPage = process.env.WATER_DIAGNOSTIC_RELOAD === '1';
 const captureRoot = resolve('artifacts', 'water-diagnostic');
 const browser = await chromium.launch({
   headless: true,
@@ -48,7 +49,7 @@ try {
     timeout: 10000,
   });
   console.log(`[runner ${stamp()}] DOMContentLoaded ${page.url()}`);
-  if (captureSplash || captureFrames) {
+  if (reloadPage || captureSplash || captureFrames) {
     await page.reload({
       waitUntil: 'domcontentloaded',
       timeout: 10000,
@@ -102,6 +103,9 @@ try {
     const stage = document.querySelector('[data-home-stage]');
     const canvas = host?.querySelector('canvas');
     const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
+    const background = document.querySelector('[data-background-reveal]');
+    const video = document.querySelector('#background-video');
+    const bootSurface = document.querySelector('[data-home-boot]');
     return {
       url: location.href,
       visibilityState: document.visibilityState,
@@ -113,6 +117,13 @@ try {
         clientWidth: canvas.clientWidth,
         clientHeight: canvas.clientHeight,
       } : null,
+      layers: {
+        bootSurfacePresent: Boolean(bootSurface),
+        backgroundOpacity: background ? getComputedStyle(background).opacity : null,
+        backgroundClipPath: background ? getComputedStyle(background).clipPath : null,
+        videoReadyState: video instanceof HTMLVideoElement ? video.readyState : null,
+        videoPaused: video instanceof HTMLVideoElement ? video.paused : null,
+      },
       webgl: gl ? {
         contextLost: gl.isContextLost(),
         renderer: gl.getParameter(gl.RENDERER),

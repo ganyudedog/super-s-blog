@@ -1,22 +1,126 @@
 ---
-import { siteConfig } from '../config';
 import ContentLayout from '../layouts/ContentLayout.astro';
+
+const techStack = [
+  {
+    name: 'React',
+    href: 'https://react.dev/',
+    icon: 'https://api.iconify.design/logos:react.svg',
+    className: 'border-[#61dafb]/20 bg-[#61dafb]/10 hover:border-[#61dafb]/45',
+  },
+  {
+    name: 'Tailwind CSS',
+    href: 'https://tailwindcss.com/',
+    icon: 'https://api.iconify.design/logos:tailwindcss-icon.svg',
+    className: 'border-[#38bdf8]/20 bg-[#38bdf8]/10 hover:border-[#38bdf8]/45',
+  },
+  {
+    name: 'PixiJS',
+    href: 'https://pixijs.com/',
+    icon: 'https://api.iconify.design/logos:pixijs.svg',
+    className: 'border-[#ffd700]/20 bg-[#ffd700]/10 hover:border-[#ffd700]/45',
+  },
+  {
+    name: 'TypeScript',
+    href: 'https://www.typescriptlang.org/',
+    icon: 'https://api.iconify.design/logos:typescript-icon.svg',
+    className: 'border-[#3178c6]/20 bg-[#3178c6]/10 hover:border-[#3178c6]/45',
+  },
+  {
+    name: 'Node.js',
+    href: 'https://nodejs.org/',
+    icon: 'https://api.iconify.design/logos:nodejs-icon.svg',
+    className: 'border-[#68a063]/20 bg-[#68a063]/10 hover:border-[#68a063]/45',
+  },
+] as const;
+
+const maskedTextClass =
+  'cursor-help rounded-sm bg-black px-1 text-black transition-colors duration-200 hover:text-white focus:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200';
 ---
 
-<ContentLayout title="关于" description={`关于${siteConfig.author.name}与这个博客。`}>
-  <article class="route-document px-1 py-5 text-slate-200 md:px-2 md:py-7">
-    <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-rose-200/85">ABOUT</p>
-    <h1 class="m-0 text-3xl font-semibold text-slate-100">{siteConfig.author.name}</h1>
-    <p class="mt-5 max-w-[68ch] text-[0.95rem] leading-8 text-slate-300">{siteConfig.author.bio}</p>
-    <dl class="mt-7 grid gap-3 border-t border-white/10 pt-5 text-sm sm:grid-cols-2">
-      <div>
-        <dt class="text-slate-400">当前关注</dt>
-        <dd class="mt-1 font-semibold text-cyan-100">{siteConfig.author.focus}</dd>
+<ContentLayout title="关于" description="关于甘雨的狗与这个博客。">
+  <article class="route-document px-1 py-5 text-[0.95rem] leading-8 text-slate-100/90 md:px-2 md:py-7">
+    <header>
+      <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-rose-200/85">ABOUT</p>
+      <h1 class="m-0 text-3xl font-semibold text-slate-100">关于我</h1>
+      <h2 class="mb-0 mt-5 text-2xl font-medium text-cyan-50 text-center">Ciallo～(∠・ω&lt; )⌒☆</h2>
+    </header>
+    <br />
+    <div class="mt-2 max-w-[72ch] space-y-3">
+      <p class="m-0">
+        我是 <span class="font-semibold text-[#b8d9e8]">甘雨</span> 的狗，当然，你也可以叫我 <strong class="font-semibold text-slate-100">南柯一梦</strong>，或者叫我
+        <code class="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[0.88em] text-cyan-50">super</code> 也行。
+      </p>
+
+      <p class="m-0 pt-1">
+        欢迎来到我的<strong class="font-semibold text-slate-100">异空间仓库</strong>——一个介于现实与幻想之间的数字角落。
+      </p>
+
+      <p class="m-0">这里主要存放以下几类东西：</p>
+
+      <ul class="m-0 list-none space-y-2 p-0 text-slate-50">
+        <li>📘 · <strong class="font-semibold text-white">学习笔记</strong> —— 从代码废墟和文档灰烬里捞出来的残页，记录着我与各种框架、库搏斗的痕迹。</li>
+        <li>💭 · <strong class="font-semibold text-white">脑内风暴</strong> —— 无聊时的胡思乱想、突发奇想、以及一些不切实际的幻想。俗称白日梦。</li>
+        <li>📖 · <strong class="font-semibold text-white">往事残片</strong> —— 零零碎碎的个人经历，有些是趣事，有些是教训，有些单纯就是想记下来。</li>
+      </ul>
+
+      <p class="m-0 pt-1">
+        至于用途嘛……<br />
+        一方面是给未来的自己留个念想，方便回头看看“哦，原来那时候我在折腾这个”；<br />
+        另一方面，如果路过的你恰好觉得某个碎片有点意思，也欢迎坐下来聊两句。
+      </p>
+    </div>
+
+    <section class="mt-6 max-w-[72ch] border-t border-dashed border-white/25 pt-5" aria-labelledby="about-profile-title">
+      <h2 id="about-profile-title" class="m-0 text-base text-xl font-semibold text-slate-100">现在的我</h2>
+      <p class="mb-0 mt-1">
+        目前就读于 <span class="font-medium text-amber-300">左家垅皇家男子职业技术学校</span>
+        <span class={maskedTextClass} tabindex="0">湖南最好的大专，懂的都懂</span>。<br />
+        满打满算，写代码这事儿已经折腾了 <strong class="font-semibold text-slate-100">两年</strong> 出头。<br />
+        一个 <span class="font-medium text-pink-400">贵物前端</span>，时不时客串一下全栈开发。<br />
+        开源社区？我属于那种“看了点点 Star、偶尔偷学两招然后默默溜走”的类型。<br />
+        简而言之：<span class="text-slate-200/90">水平一般，但确实在写。</span>
+      </p>
+
+    </section>
+
+    <section class="mt-6 border-t border-dashed border-white/25 pt-5" aria-labelledby="productivity-title">
+      <h2 id="productivity-title" class="m-0 text-base text-xl font-semibold text-slate-100">关于生产力</h2>
+      <p class="mb-0 mt-1">目前主要折腾的技术栈：</p>
+      <div class="mt-2 flex max-w-[48rem] flex-wrap gap-2">
+        {techStack.map((tech) => (
+          <a
+            class:list={[
+              'tech-card inline-flex min-h-9 items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-100',
+              tech.className,
+            ]}
+            href={tech.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${tech.name} 官网（新窗口打开）`}
+          >
+            <img class="size-5 object-contain" src={tech.icon} alt="" width="20" height="20" loading="lazy" aria-hidden="true" />
+            <span>{tech.name}</span>
+          </a>
+        ))}
+        <span class="tech-card inline-flex min-h-9 items-center rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-sm text-slate-100">杂七杂八</span>
       </div>
-      <div>
-        <dt class="text-slate-400">所在地</dt>
-        <dd class="mt-1 font-semibold text-amber-100">{siteConfig.author.location}</dd>
-      </div>
-    </dl>
+      <p class="mb-0 mt-3 text-sm text-slate-200/85">
+        以及各种突发奇想的瞎折腾——毕竟不亲手踩一遍坑，知识点就不算真正属于我。
+      </p>
+    </section>
   </article>
 </ContentLayout>
+
+<style>
+  .tech-card {
+    background-color: rgba(224, 240, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.28);
+  }
+
+  a.tech-card:hover,
+  a.tech-card:focus-visible {
+    background-color: rgba(232, 246, 255, 0.2);
+    border-color: rgba(207, 250, 254, 0.58);
+  }
+</style>

@@ -18,16 +18,18 @@ const { revealed = false } = Astro.props;
   transition:name="site-personal-panel"
   transition:persist
 >
-  <div class="personal-identity flex items-center gap-3">
-    <div class="profile-mark grid size-14 shrink-0 place-items-center rounded-full border border-cyan-200/35 bg-slate-950/75 text-xl font-extrabold text-cyan-100" aria-hidden="true">S</div>
-    <div>
-      <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">PROFILE</p>
+  <div class="personal-identity gap-3">
+    <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">PROFILE</p>
+    <div class="profile-mark size-50 shrink-0 rounded-full border border-cyan-200/35 overflow-hidden" aria-hidden="true">
+      <img src="/image/head.jpg" class="w-full hover:contrast-130" alt="">
+    </div>
+    <div class="mt-2 text-center">
       <h2 id="personal-title" class="m-0 text-base font-semibold text-slate-100">{siteConfig.author.name}</h2>
       <p class="mt-1 text-xs leading-5 text-amber-200/80">{siteConfig.author.role}</p>
     </div>
   </div>
 
-  <p class="my-5 text-[0.8rem] leading-7 text-slate-300">
+  <p class="my-5 text-[0.8rem] leading-7 text-slate-300 text-center">
     {siteConfig.author.bio}
   </p>
 
@@ -43,7 +45,13 @@ const { revealed = false } = Astro.props;
   </dl>
 
   <div class="mt-4 grid grid-cols-2 gap-2">
-    <a class="rounded-md border border-cyan-200/20 bg-cyan-100/10 px-2 py-2 text-center text-xs font-semibold text-cyan-100 transition hover:bg-cyan-100/20" href={siteConfig.author.github} rel="noreferrer">GitHub</a>
-    <a class="rounded-md border border-rose-200/20 bg-rose-100/10 px-2 py-2 text-center text-xs font-semibold text-rose-100 transition hover:bg-rose-100/20" href={`mailto:${siteConfig.author.email}`}>Email</a>
+    <a class="inline-flex items-center justify-center gap-2 rounded-md border border-cyan-200/20 bg-cyan-100/10 px-2 py-2 text-center text-xs font-semibold text-cyan-100 transition hover:bg-cyan-100/20" href={siteConfig.author.github} rel="noreferrer" target="_blank">
+      <img class="size-4" src="https://api.iconify.design/simple-icons:github.svg?color=%23cffafe" alt="" width="16" height="16" aria-hidden="true" />
+      <span>GitHub</span>
+    </a>
+    <a class="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200/20 bg-rose-100/10 px-2 py-2 text-center text-xs font-semibold text-rose-100 transition hover:bg-rose-100/20" href={`mailto:${siteConfig.author.email}`}>
+      <img class="size-4" src="https://api.iconify.design/lucide:mail.svg?color=%23ffe4e6" alt="" width="16" height="16" aria-hidden="true" />
+      <span>Email</span>
+    </a>
   </div>
 </aside>

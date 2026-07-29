@@ -562,7 +562,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       splashCoreVertexShader,
       splashCoreFragmentShader,
     );
-    coreWaveMaterial.side = THREE.FrontSide;
+    coreWaveMaterial.side = THREE.DoubleSide;
     coreWaveMaterial.polygonOffset = true;
     coreWaveMaterial.polygonOffsetFactor = -1;
     coreWaveMaterial.polygonOffsetUnits = -1;

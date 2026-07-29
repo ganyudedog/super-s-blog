@@ -5,9 +5,9 @@ export const siteConfig = {
   author: {
     name: '甘雨的狗',
     role: 'Frontend & creative coding',
-    bio: '记录代码、图形与日常观察，也保存那些值得反复推敲的实现细节。',
+    bio: '当是干雩逢甘雨,愿以清心报卿心',
     focus: 'WebGL / react',
-    location: 'China',
+    location: 'China | 中国',
     github: 'https://github.com/ganyudedog',
     email: '2655314552@qq.com',
   },
@@ -20,3 +20,18 @@ export const navItems = [
   { label: '关于', href: '/about' },
   { label: '友链', href: '/friend' }
 ] as const;
+
+export interface FriendItem {
+  name: string;
+  description: string;
+  href: string;
+  avatar: string;
+}
+
+export const friendItems:FriendItem[] = [] ;
+
+export const friendSiteInfo = {
+  name: siteConfig.title,
+  description: '月相流转之间，我以我为锚点。',
+  avatar: '/image/favicon.ico',
+} as const;

@@ -55,7 +55,9 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 			data-video-reveal-state={intro ? 'waiting' : 'ready'}
 			data-route-reveal-state={intro ? 'waiting' : 'ready'}
 		>
-			<div class="home-boot-surface" data-home-boot aria-hidden="true"></div>
+			{intro && (
+				<div class="home-boot-surface" data-home-boot aria-hidden="true"></div>
+			)}
 			<BackgroundVideo revealed={!intro} />
 			<SplashScreen
 				intro={intro}

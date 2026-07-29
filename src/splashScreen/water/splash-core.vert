@@ -79,8 +79,13 @@ void main() {
   height = mix(height, sampleWaterHeight(horizontalPosition) - 0.052, rootAttachment);
 
   float stretch = smoothstep(0.34, 0.92, uAge);
-  float shellThickness = mix(0.044, 0.0055, smoothstep(0.0, 1.0, radial))
-    * mix(1.0, 0.62, stretch);
+  float shellThickness = mix(0.062, 0.011, smoothstep(0.0, 1.0, radial))
+    * mix(1.0, 0.68, stretch);
+  float capillaryThickness = edge
+    * mix(0.006, 0.025, formation)
+    * mix(1.0, 0.72, stretch)
+    * mix(0.9, 1.12, aLobeStrength);
+  shellThickness += capillaryThickness;
   float radialVelocityGradient = max(outerLaunchSpeed - 2.45, 0.0)
     * mix(0.42, 0.78, sqrt(max(radial, 0.0001)));
   float radialHeightSlope = radialVelocityGradient * flightTime * formation

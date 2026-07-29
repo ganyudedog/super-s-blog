@@ -7,7 +7,7 @@ const notes = (await getCollection('posts', ({ data }) => !data.draft && data.ca
   .sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
 ---
 
-<ContentLayout title="笔记" description="短篇技术笔记与观察。">
+<ContentLayout title="笔记" description="短篇技术笔记与观察">
   <header class="mb-5 px-1 text-slate-100">
     <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-amber-200/85">NOTES</p>
     <h1 class="m-0 text-3xl font-semibold">随手笔记</h1>
