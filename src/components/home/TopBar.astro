@@ -172,7 +172,9 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
       results.replaceChildren(...matches.map((match) => {
         const link = document.createElement('a');
         link.className = 'top-search-result';
-        link.href = `/posts/${encodeURIComponent(match.id)}`;
+        // Encode each path segment independently so nested post IDs keep their `/` separators.
+        const postPath = match.id.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+        link.href = `/posts/${postPath}`;
         link.setAttribute('role', 'option');
         link.innerHTML = '<strong></strong><span></span>';
         highlight(link.querySelector('strong'), match.title, query);
