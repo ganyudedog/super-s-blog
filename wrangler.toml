@@ -2,10 +2,6 @@ name = "super-s-blog"
 compatibility_date = "2026-07-29"
 pages_build_output_dir = "./dist"
 
-[assets]
-directory = "./dist"
-binding = "STATIC_ASSETS"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "super-s-blog-comments"
