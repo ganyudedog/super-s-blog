@@ -30,6 +30,7 @@ const serializedTargetId = JSON.stringify(targetId);
       <textarea name="content" maxlength="1000" required rows="5" placeholder="无需登录，留下你的想法吧。"></textarea>
     </label>
     <div class="comment-editor-footer">
+      <p class="comment-status" data-comment-status aria-live="polite"></p>
       <span class="comment-length" data-comment-length>0 字</span>
       <button type="submit" class="comment-submit">提交</button>
     </div>
