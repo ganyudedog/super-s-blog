@@ -2,6 +2,7 @@
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import TagBadge from '../../components/blog/TagBadge.astro';
 import ContentLayout from '../../layouts/ContentLayout.astro';
+import Comments from '../../components/comments/Comments.astro';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
@@ -37,5 +38,6 @@ const published = post.data.published.toLocaleDateString('zh-CN', {
     <div class="article-prose pt-5">
       <Content />
     </div>
+    <Comments targetId={`post:${post.id}`} />
   </article>
 </ContentLayout>

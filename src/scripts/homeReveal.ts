@@ -134,7 +134,7 @@ export function initHomeReveal() {
     if (video) {
       void video.play().catch(() => undefined);
       const mobile = window.matchMedia('(max-width: 767px)').matches;
-      const videoFrameReady = await waitForDecodedVideoFrame(video, mobile ? 1600 : 900);
+      const videoFrameReady = await waitForDecodedVideoFrame(video, mobile ? 1600 : 2400);
       stage.dataset.videoFrameReady = String(videoFrameReady);
     }
     stage.dataset.revealState = 'running';

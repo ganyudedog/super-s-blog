@@ -1,2 +1,4 @@
 allowBuilds:
   esbuild: false
+  ffmpeg-static: true
+  workerd: true

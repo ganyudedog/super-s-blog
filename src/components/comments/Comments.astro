@@ -1,0 +1,116 @@
+---
+interface Props {
+  targetId: string;
+}
+
+const { targetId } = Astro.props;
+const serializedTargetId = JSON.stringify(targetId);
+---
+
+<section class="comments-panel mt-10" data-comments data-target-id={targetId} aria-labelledby={`comments-title-${targetId}`}>
+  <div class="comments-heading">
+    <div>
+      <p class="m-0 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-100/85">COMMENTS</p>
+      <h2 id={`comments-title-${targetId}`} class="m-0 mt-1 text-xl font-semibold text-white">留言</h2>
+    </div>
+    <span class="comments-count" data-comments-count>加载中</span>
+  </div>
+
+  <div class="mt-4 grid gap-3" data-comments-list>
+    <p class="m-0 text-sm text-slate-200/75">正在读取留言...</p>
+  </div>
+
+  <form class="comment-editor" data-comment-form>
+    <label class="comment-name-field">
+      <span>昵称</span>
+      <input name="name" maxlength="32" required placeholder="怎么称呼你" />
+    </label>
+    <label class="comment-content-field">
+      <span class="sr-only">留言内容</span>
+      <textarea name="content" maxlength="1000" required rows="5" placeholder="无需登录，留下你的想法吧。"></textarea>
+    </label>
+    <div class="comment-editor-footer">
+      <span class="comment-length" data-comment-length>0 字</span>
+      <button type="submit" class="comment-submit">提交</button>
+    </div>
+  </form>
+</section>
+
+<script define:vars={{ targetId: serializedTargetId }}>
+  const initComments = (root) => {
+    if (root.dataset.commentsReady === 'true') return;
+    root.dataset.commentsReady = 'true';
+    const id = JSON.parse(targetId);
+    const list = root.querySelector('[data-comments-list]');
+    const count = root.querySelector('[data-comments-count]');
+    const form = root.querySelector('[data-comment-form]');
+    const status = root.querySelector('[data-comment-status]');
+    const contentInput = form.querySelector('[name="content"]');
+    const length = root.querySelector('[data-comment-length]');
+    contentInput.addEventListener('input', () => { length.textContent = `${contentInput.value.length} 字`; });
+    const render = (comments) => {
+      count.textContent = `${comments.length} 条留言`;
+      list.replaceChildren(...(comments.length ? comments.map((comment) => {
+        const item = document.createElement('article');
+        item.className = 'comment-item';
+        item.innerHTML = `<div class="flex items-center justify-between gap-3"><strong class="text-sm text-white"></strong><time class="text-xs text-slate-200/60"></time></div><p class="m-0 mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-100/90"></p>`;
+        item.querySelector('strong').textContent = comment.name;
+        item.querySelector('time').textContent = new Date(comment.createdAt).toLocaleString('zh-CN');
+        item.querySelector('p').textContent = comment.content;
+        return item;
+      }) : [Object.assign(document.createElement('p'), { className: 'm-0 text-sm text-slate-200/70', textContent: '还没有留言，来写下第一条吧。' })]));
+    };
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/comments?target=${encodeURIComponent(id)}`);
+        if (!response.ok) throw new Error('load');
+        render(await response.json());
+      } catch { list.innerHTML = '<p class="m-0 text-sm text-rose-100/85">留言暂时无法加载。</p>'; count.textContent = ''; }
+    };
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = form.querySelector('button');
+      button.disabled = true;
+      status.textContent = '正在发布...';
+      try {
+        const data = Object.fromEntries(new FormData(form));
+        const response = await fetch('/api/comments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...data, targetId: id }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '发布失败');
+        form.reset();
+        status.textContent = '留言已发布。';
+        render(result.comments);
+      } catch (error) { status.textContent = error.message || '发布失败，请稍后再试。'; }
+      finally { button.disabled = false; }
+    });
+    load();
+  };
+  document.querySelectorAll('[data-comments]').forEach(initComments);
+  document.addEventListener('astro:page-load', () => document.querySelectorAll('[data-comments]').forEach(initComments));
+</script>
+
+<style is:global>
+  .comments-panel { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,.2); }
+  .comments-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+  .comments-count { color: rgba(226,232,240,.65); font-size: .75rem; }
+  .comment-editor { margin-top: 1rem; overflow: hidden; border: 1px solid rgba(255,255,255,.22); border-radius: .75rem; background: rgba(225,243,255,.1); box-shadow: 0 14px 34px rgba(0,0,0,.16); }
+  .comment-name-field { display: block; padding: .75rem 1rem; border-bottom: 1px dashed rgba(255,255,255,.6); }
+  .comment-name-field span { display: block; margin-bottom: .3rem; color: rgba(226,232,240,.72); font-size: .72rem; }
+  .comment-name-field input, .comment-content-field textarea { width: 100%; border: 0; background: transparent; color: #f4f8fb; outline: none; }
+  .comment-name-field input { font-size: .9rem; }
+  .comment-content-field { display: block; padding: .85rem 1rem .5rem; border-bottom: 1px dashed rgba(255,255,255,.6); }
+  .comment-content-field textarea { min-height: 7rem; resize: vertical; font-size: .9rem; line-height: 1.7; }
+  .comment-name-field input::placeholder, .comment-content-field textarea::placeholder { color: rgba(203,214,225,.62); }
+  .comment-name-field:focus-within, .comment-content-field:focus-within { background: rgba(225,243,255,.06); }
+  .comment-editor-footer { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; padding: .6rem .75rem .75rem 1rem; }
+  .comment-status { flex: 1; margin: 0; color: rgba(226,232,240,.62); font-size: .72rem; }
+  .comment-length { color: rgba(226,232,240,.62); font-size: .72rem; white-space: nowrap; }
+  .comment-submit { border: 1px solid rgba(255,255,255,.38); border-radius: .4rem; background: rgba(248,250,252,.92); color: #172b3d; padding: .55rem 1rem; font-size: .78rem; font-weight: 650; cursor: pointer; }
+  .comment-submit:hover { background: white; }
+  .comment-submit:disabled { cursor: wait; opacity: .55; }
+  .comment-item { padding: .8rem 0; border-bottom: 1px solid rgba(255,255,255,.14); }
+  .comment-item strong { color: #f4f8fb; }
+  .comment-item time { color: rgba(226,232,240,.55); }
+  .comment-item p { color: rgba(226,232,240,.84); }
+  @media (max-width: 560px) { .comment-editor-footer { align-items: flex-end; flex-wrap: wrap; } .comment-status { flex-basis: 100%; } }
+</style>

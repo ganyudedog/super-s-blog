@@ -21,7 +21,7 @@ export const navItems = [
   { label: '笔记', href: '/notes' },
   { label: '随笔', href: '/essay' },
   { label: '关于', href: '/about' },
-  { label: '友链', href: '/friend' }
+  { label: '友链', href: '/friend' },
 ] as const;
 
 // 标签颜色只控制文字和边框；新增标签时在这里补充即可。

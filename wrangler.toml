@@ -1,0 +1,8 @@
+name = "super-s-blog"
+compatibility_date = "2026-07-29"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "super-s-blog-comments"
+database_id = "12951645-287a-43d6-b5c7-c671df8d18e6"

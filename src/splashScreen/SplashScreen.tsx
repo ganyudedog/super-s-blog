@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   detectWaterCompatibility,
   type WaterCompatibilityProfile,
 } from './waterCompatibility';
 
-const WaterScene = lazy(() => import('./WaterScene'));
-const PointerWaterLayer = lazy(() => import('./PointerWaterLayer'));
+import PointerWaterLayer from './PointerWaterLayer';
+import WaterScene from './WaterScene';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -85,11 +85,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
   if (!profile) return null;
 
   if (!profile.mainWater) {
-    return profile.pointerWater ? (
-      <Suspense fallback={null}>
-        <PointerWaterLayer />
-      </Suspense>
-    ) : null;
+    return profile.pointerWater ? <PointerWaterLayer /> : null;
   }
 
   return (
@@ -99,10 +95,8 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
         data-water-night
         style={{ opacity: intro ? 1 : 0 }}
       />
-      <Suspense fallback={null}>
-        <WaterScene intro={intro} onComplete={onComplete} />
-        {profile.pointerWater && <PointerWaterLayer />}
-      </Suspense>
+      <WaterScene intro={intro} onComplete={onComplete} />
+      {profile.pointerWater && <PointerWaterLayer />}
     </div>
   );
 }

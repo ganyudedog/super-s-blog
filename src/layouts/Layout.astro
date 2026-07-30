@@ -65,9 +65,19 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 				transition:persist="water-scene"
 				transition:persist-props
 			/>
-			<TopBar revealed={!intro} />
+			<TopBar
+				revealed={!intro}
+				searchPosts={posts.map((post) => ({
+					id: post.id,
+					title: post.data.title,
+					description: post.data.description,
+					category: post.data.category,
+					tags: post.data.tags,
+					body: post.body ?? '',
+				}))}
+			/>
 			<main
-				class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-24 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
+				class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-8 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
 				data-home-content
 			>
 				<div class="contents md:col-start-1 md:row-start-1 md:grid md:content-start md:gap-5 xl:contents">

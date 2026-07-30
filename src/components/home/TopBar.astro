@@ -1,11 +1,21 @@
 ---
 import { navItems, siteConfig } from '../../config';
 
-interface Props {
-  revealed?: boolean;
+interface SearchPost {
+	id: string;
+	title: string;
+	description: string;
+	category: string;
+	tags: string[];
+	body: string;
 }
 
-const { revealed = false } = Astro.props;
+interface Props {
+	revealed?: boolean;
+	searchPosts: SearchPost[];
+}
+
+const { revealed = false, searchPosts } = Astro.props;
 const pathname = Astro.url.pathname;
 const isActive = (href: string) => href === '/index/'
   ? pathname === '/' || pathname === '/index' || pathname === '/index/'
@@ -15,14 +25,14 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
 
 <header
   class:list={[
-    'top-bar fixed inset-x-3 top-3 z-30 mx-auto grid min-h-14 max-w-[1280px] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:inset-x-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4 md:px-4',
+    'top-bar relative fixed inset-x-3 top-3 z-30 mx-auto grid min-h-14 max-w-[1280px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:inset-x-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4 md:px-4',
     revealed ? 'opacity-100' : 'opacity-0',
   ]}
   data-reveal-top
   transition:name="site-top-bar"
   transition:persist
 >
-  <a class="brand col-start-2 row-start-1 flex w-fit max-w-full flex-row-reverse items-center gap-2.5 justify-self-end text-right md:col-start-1 md:flex-row md:justify-self-start md:text-left" href="/index/" aria-label="返回首页">
+  <a class="brand col-start-3 row-start-1 flex min-w-0 w-fit max-w-full flex-row-reverse items-center gap-2.5 justify-self-end text-right md:col-start-1 md:flex-row md:justify-self-start md:text-left" href="/index/" aria-label="返回首页">
     <span class="brand-mark size-9 place-items-center rounded-full border border-cyan-200/35 overflow-hidden" aria-hidden="true">
       <img class="w-full hover:contrast-125" src="/image/topbar.jpg" alt="丛雨可爱捏">
     </span>
@@ -43,6 +53,12 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
       </a>
     ))}
   </nav>
+
+  <div class="top-search absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:col-start-3 md:row-start-1 md:translate-x-0 md:translate-y-0 md:justify-self-end" data-top-search>
+    <label class="sr-only" for="top-search-input">搜索文章</label>
+    <input id="top-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="搜索文章" class="top-search-input" data-top-search-input aria-controls="top-search-results" aria-expanded="false" />
+    <div id="top-search-results" class="top-search-results" data-top-search-results role="listbox" aria-label="搜索结果"></div>
+  </div>
 
   <button class="nav-menu-button col-start-1 row-start-1 grid size-10 place-items-center justify-self-start gap-1 rounded-md border border-white/20 bg-black/25 p-2 text-slate-100 md:hidden" type="button" aria-label="打开导航菜单" aria-controls="mobile-site-nav" aria-expanded="false">
     <span></span>
@@ -99,7 +115,12 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
   </nav>
 </aside>
 
+<script type="application/json" data-top-search-data set:html={JSON.stringify(searchPosts)}></script>
+
 <script>
+  import MiniSearch, { type Query } from 'minisearch';
+  const searchDataElement = document.querySelector('[data-top-search-data]');
+  const searchPosts = searchDataElement ? JSON.parse(searchDataElement.textContent || '[]') : [];
   const normalizePath = (pathname: string) => {
     const normalized = pathname.replace(/\/+$/, '');
     return normalized || '/';
@@ -121,7 +142,55 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     });
   };
 
+  const bindTopSearch = () => {
+    const search = document.querySelector<HTMLElement>('[data-top-search]');
+    const input = search?.querySelector<HTMLInputElement>('[data-top-search-input]');
+    const results = search?.querySelector<HTMLElement>('[data-top-search-results]');
+    if (!search || !input || !results || search.dataset.searchBound === 'true') return;
+    search.dataset.searchBound = 'true';
+    const index = new MiniSearch({ fields: ['title', 'description', 'category', 'tags', 'body'], storeFields: ['title', 'description', 'category'], searchOptions: { boost: { title: 5, tags: 2, description: 2 }, prefix: true, fuzzy: 0.2 } });
+    index.addAll(searchPosts);
+    const close = () => { results.replaceChildren(); results.hidden = true; input.setAttribute('aria-expanded', 'false'); };
+    const highlight = (element: HTMLElement, text: string, query: string) => {
+      element.replaceChildren();
+      const terms = query.trim().split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length);
+      if (!terms.length) { element.textContent = text; return; }
+      const pattern = new RegExp(`(${terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'ig');
+      let cursor = 0;
+      for (const match of text.matchAll(pattern)) {
+        const start = match.index ?? 0;
+        if (start > cursor) element.append(document.createTextNode(text.slice(cursor, start)));
+        const mark = document.createElement('mark');
+        mark.textContent = match[0];
+        element.append(mark);
+        cursor = start + match[0].length;
+      }
+      if (cursor < text.length) element.append(document.createTextNode(text.slice(cursor)));
+    };
+    const render = (query: Query) => {
+      const matches = index.search(query).slice(0, 6);
+      results.replaceChildren(...matches.map((match) => {
+        const link = document.createElement('a');
+        link.className = 'top-search-result';
+        link.href = `/posts/${encodeURIComponent(match.id)}`;
+        link.setAttribute('role', 'option');
+        link.innerHTML = '<strong></strong><span></span>';
+        highlight(link.querySelector('strong'), match.title, query);
+        highlight(link.querySelector('span'), `${match.category} · ${match.description}`, query);
+        return link;
+      }));
+      results.hidden = matches.length === 0;
+      input.setAttribute('aria-expanded', String(matches.length > 0));
+    };
+    input.addEventListener('input', () => { const query = input.value.trim(); if (query.length < 1) return close(); render(query); });
+    input.addEventListener('focus', () => { if (input.value.trim()) render(input.value.trim()); });
+    document.addEventListener('pointerdown', (event) => { if (!search.contains(event.target as Node)) close(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); input.blur(); } });
+    close();
+  };
+
   const bindTopBars = () => {
+    bindTopSearch();
     document.querySelectorAll<HTMLElement>('.top-bar').forEach((topBar) => {
       updateActiveLinks();
       if (topBar.dataset.menuBound === 'true') return;
@@ -154,3 +223,19 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
   document.addEventListener('astro:page-load', bindTopBars);
   bindTopBars();
 </script>
+
+<style is:global>
+  .top-search-input { width: 10rem; border: 1px solid rgba(255,255,255,.25); border-radius: .4rem; background: rgba(4,10,18,.42); color: white; padding: .45rem .7rem; font-size: .75rem; outline: none; }
+  .top-search-input::placeholder { color: rgba(226,232,240,.68); }
+  .top-search-input:focus { border-color: rgba(186,230,253,.85); box-shadow: 0 0 0 2px rgba(186,230,253,.15); }
+  .top-search-results { position: absolute; top: calc(100% + .45rem); left: 0; width: min(22rem, 80vw); max-height: min(60vh, 24rem); overflow-y: auto; border: 1px solid rgba(255,255,255,.25); border-radius: .5rem; background: rgba(5, 10, 18, 0.6); box-shadow: 0 16px 38px rgba(0,0,0,.28); backdrop-filter: blur(16px); }
+  .top-search-results[hidden] { display: none; }
+  .top-search-result { display: block; padding: .7rem .8rem; border-bottom: 1px solid rgba(255,255,255,.16); }
+  .top-search-result:last-child { border-bottom: 0; }
+  .top-search-result:hover, .top-search-result:focus-visible { background: rgba(225,243,255,.28); outline: none; }
+  .top-search-result strong, .top-search-result span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top-search-result strong { color: #f4f8fb; font-size: .78rem; line-height: 1.45; }
+  .top-search-result span { margin-top: .25rem; color: rgba(226,232,240,.82); font-size: .68rem; line-height: 1.45; }
+  .top-search-result mark { border-radius: .2rem; background: rgba(250, 204, 21, .55); color: #172b3d; padding: .02rem .16rem; box-shadow: 0 0 0 1px rgba(217, 165, 0, .25); }
+  @media (max-width: 767px) { .top-search-input { width: clamp(5.5rem, 30vw, 10rem); } .brand strong { max-width: clamp(4.5rem, 25vw, 9rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .brand small { display: none; } .brand-mark { width: clamp(1.9rem, 8vw, 2.25rem); height: clamp(1.9rem, 8vw, 2.25rem); } }
+</style>

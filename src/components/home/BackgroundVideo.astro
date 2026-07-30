@@ -25,13 +25,14 @@ const { revealed = false } = Astro.props;
     loop
     playsinline
     preload="auto"
+    fetchpriority="high"
     poster="/background/WUWA-poster.jpg"
     disablepictureinpicture
     controlslist="nodownload noplaybackrate nofullscreen"
     tabindex="-1"
   >
     <source src="/background/WUWA-mobile.mp4" type="video/mp4" media="(max-width: 767px)" />
-    <source src="/background/WUWA 尤诺H.264.mp4" type="video/mp4" />
+    <source src="/background/WUWA-desktop.mp4" type="video/mp4" />
   </video>
   <div class="background-video-grade"></div>
 </div>

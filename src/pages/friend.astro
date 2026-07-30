@@ -1,6 +1,7 @@
 ---
 import ContentLayout from '../layouts/ContentLayout.astro';
 import { friendItems, friendSiteInfo } from '../config';
+import Comments from '../components/comments/Comments.astro';
 ---
 
 <ContentLayout title="友链" description="关于成长路上遇见的有趣朋友。">
@@ -92,11 +93,12 @@ import { friendItems, friendSiteInfo } from '../config';
           </div>
           <div>
             <dt class="text-xs text-slate-200/75">站点图标</dt>
-            <dd class="m-0 mt-1 font-mono text-xs text-cyan-50">{friendSiteInfo.avatar}</dd>
+            <dd class="m-0 mt-1 font-medium text-white">{friendSiteInfo.avatar}</dd>
           </div>
         </dl>
       </aside>
     </section>
+    <Comments targetId="friends" />
   </article>
 </ContentLayout>
 
