@@ -33,6 +33,8 @@ export const tagColors = {
   think: 'border-emerald-200/70 text-emerald-100',
   typescript: 'border-sky-200/70 text-sky-100',
   react: 'border-blue-200/70 text-blue-100',
+  live2d: 'border-fuchsia-200/70 text-fuchsia-100',
+  graphic: 'border-orange-200/70 text-orange-100',
 } as const;
 
 export const defaultTagColor = 'border-slate-200/60 text-slate-100';

@@ -134,8 +134,10 @@ export function initHomeReveal() {
     if (video) {
       void video.play().catch(() => undefined);
       const mobile = window.matchMedia('(max-width: 767px)').matches;
-      const videoFrameReady = await waitForDecodedVideoFrame(video, mobile ? 1600 : 2400);
-      stage.dataset.videoFrameReady = String(videoFrameReady);
+      void waitForDecodedVideoFrame(video, mobile ? 1600 : 2400).then((videoFrameReady) => {
+        stage.dataset.videoFrameReady = String(videoFrameReady);
+        stage.dataset.videoPlaybackState = videoFrameReady ? 'ready' : 'pending';
+      });
     }
     stage.dataset.revealState = 'running';
     stage.dataset.videoRevealState = 'running';
@@ -247,7 +249,7 @@ export function initHomeReveal() {
   const onWaterReveal = (event: Event) => {
     window.clearTimeout(sceneFallback);
     traceReveal('water-reveal-received');
-    void startReveal((event as CustomEvent<WaterRevealDetail>).detail);
+    void startReveal((event as CustomEvent<WaterRevealDetail>).detail ?? {});
   };
   window.addEventListener('water:reveal', onWaterReveal, { once: true });
 

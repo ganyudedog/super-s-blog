@@ -32,10 +32,11 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
   const [profile, setProfile] = useState<WaterCompatibilityProfile | null>(null);
 
   useEffect(() => {
-    const redirectFromIntro = () => {
+    const skipIntroWithoutNavigation = () => {
       if (!intro || window.location.pathname !== '/') return;
       const search = import.meta.env.DEV ? window.location.search : '';
-      window.location.replace(`/index/${search}`);
+      window.history.replaceState(window.history.state, '', `/index/${search}`);
+      window.dispatchEvent(new CustomEvent('water:reveal'));
     };
     let nextProfile: WaterCompatibilityProfile;
     try {
@@ -53,7 +54,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
     exposeCompatibilityProfile(nextProfile);
     setProfile(nextProfile);
 
-    if (nextProfile.mode === 'compatibility') redirectFromIntro();
+    if (nextProfile.mode === 'compatibility') skipIntroWithoutNavigation();
 
     const handleRuntimeFallback = (event: Event) => {
       const detail = (event as CustomEvent<CompatibilityFallbackDetail>).detail;
@@ -72,7 +73,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
           renderer: currentProfile.renderer,
         };
         exposeCompatibilityProfile(compatibilityFallback);
-        redirectFromIntro();
+        skipIntroWithoutNavigation();
         return compatibilityFallback;
       });
     };

@@ -3,7 +3,7 @@ import { getCollection } from 'astro:content';
 import PostCard from '../components/blog/PostCard.astro';
 import ContentLayout from '../layouts/ContentLayout.astro';
 
-const essays = (await getCollection('posts', ({ data }) => !data.draft && data.category === 'Essay'))
+const essays = (await getCollection('posts', ({ data }) => !data.draft && data.category === 'Essays'))
   .sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
 ---
 

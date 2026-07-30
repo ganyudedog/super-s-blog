@@ -403,6 +403,12 @@ noscript .home-stage {
   line-height: 1.9;
 }
 
+.article-prose img,
+.article-card img {
+  display: block;
+  margin-inline: auto;
+}
+
 .article-prose h2,
 .article-prose h3,
 .article-prose h4,
