@@ -107,6 +107,15 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 			import { gsap } from 'gsap';
 			import { swapFunctions } from 'astro:transitions/client';
 
+			const loadArticleMedia = () => {
+				document.querySelectorAll<HTMLAudioElement>('.article-prose audio').forEach((audio) => {
+					if (audio.dataset.routeMediaLoaded === 'true') return;
+					audio.dataset.routeMediaLoaded = 'true';
+					if (audio.preload === '') audio.preload = 'metadata';
+					audio.load();
+				});
+			};
+
 			const bindScrollChrome = () => {
 				const button = document.querySelector<HTMLButtonElement>('[data-back-to-top]');
 				if (!button || button.dataset.scrollBound === 'true') return;
@@ -182,7 +191,9 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 			};
 
 			document.addEventListener('astro:page-load', bindScrollChrome);
+			document.addEventListener('astro:page-load', loadArticleMedia);
 			bindScrollChrome();
+			loadArticleMedia();
 
 			document.addEventListener('astro:before-swap', (event) => {
 				const currentRoute = document.querySelector<HTMLElement>('.route-panel');
@@ -205,6 +216,7 @@ const noteCount = posts.filter((post) => post.data.category === 'Notes').length;
 			});
 
 			document.addEventListener('astro:after-swap', () => {
+				loadArticleMedia();
 				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 				const route = document.querySelector<HTMLElement>('.route-panel');
 				if (!route) return;

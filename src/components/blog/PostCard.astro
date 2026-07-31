@@ -22,7 +22,7 @@ const categoryClass = post.data.category === 'Frontend'
 ---
 
 <article class="route-item article-card rounded-lg border border-white/15 p-4 md:p-5">
-  <a class="group block rounded-md transition hover:bg-white/3 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70" href={`/posts/${post.id}`}>
+  <a class="group block rounded-md transition hover:bg-white/3 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70" href={`/posts/${post.id}/`}>
     <div class="flex flex-wrap items-center gap-2 text-[0.68rem] text-slate-400">
       <time datetime={post.data.published.toISOString()} class="text-white">{published}</time>
       <span class:list={['border-l pl-2 font-semibold', categoryClass]}>{post.data.category}</span>

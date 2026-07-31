@@ -25,7 +25,7 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
 
 <header
   class:list={[
-    'top-bar relative fixed inset-x-3 top-3 z-30 mx-auto grid min-h-14 max-w-[1280px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:inset-x-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4 md:px-4',
+    'top-bar relative z-30 mx-auto mt-3 w-[calc(100%-1.5rem)] max-w-[1280px] grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.3)] backdrop-blur-xl md:w-[calc(100%-2rem)] md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4 md:px-4',
     revealed ? 'opacity-100' : 'opacity-0',
   ]}
   data-reveal-top
@@ -54,10 +54,15 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     ))}
   </nav>
 
-  <div class="top-search absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:col-start-3 md:row-start-1 md:translate-x-0 md:translate-y-0 md:justify-self-end" data-top-search>
-    <label class="sr-only" for="top-search-input">搜索文章</label>
-    <input id="top-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="搜索文章" class="top-search-input" data-top-search-input aria-controls="top-search-results" aria-expanded="false" />
-    <div id="top-search-results" class="top-search-results" data-top-search-results role="listbox" aria-label="搜索结果"></div>
+  <div class="top-search col-start-2 row-start-1 min-w-0 justify-self-start md:static md:col-start-3 md:row-start-1 md:justify-self-end" data-top-search>
+    <button class="mobile-search-toggle md:hidden" type="button" aria-label="搜索文章" aria-controls="top-search-input" aria-expanded="false" data-mobile-search-toggle>
+      <span aria-hidden="true">&#128269;</span>
+    </button>
+    <div class="top-search-field">
+      <label class="sr-only" for="top-search-input">搜索文章</label>
+      <input id="top-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="搜索文章" class="top-search-input" data-top-search-input aria-controls="top-search-results" aria-expanded="false" />
+      <div id="top-search-results" class="top-search-results" data-top-search-results role="listbox" aria-label="搜索结果"></div>
+    </div>
   </div>
 
   <button class="nav-menu-button col-start-1 row-start-1 grid size-10 place-items-center justify-self-start gap-1 rounded-md border border-white/20 bg-black/25 p-2 text-slate-100 md:hidden" type="button" aria-label="打开导航菜单" aria-controls="mobile-site-nav" aria-expanded="false">
@@ -146,10 +151,16 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     const search = document.querySelector<HTMLElement>('[data-top-search]');
     const input = search?.querySelector<HTMLInputElement>('[data-top-search-input]');
     const results = search?.querySelector<HTMLElement>('[data-top-search-results]');
+    const toggle = search?.querySelector<HTMLButtonElement>('[data-mobile-search-toggle]');
     if (!search || !input || !results || search.dataset.searchBound === 'true') return;
     search.dataset.searchBound = 'true';
     const index = new MiniSearch({ fields: ['title', 'description', 'category', 'tags', 'body'], storeFields: ['title', 'description', 'category'], searchOptions: { boost: { title: 5, tags: 2, description: 2 }, prefix: true, fuzzy: 0.2 } });
     index.addAll(searchPosts);
+    const setExpanded = (expanded: boolean) => {
+      search.classList.toggle('is-expanded', expanded);
+      toggle?.setAttribute('aria-expanded', String(expanded));
+      if (expanded) window.requestAnimationFrame(() => input.focus());
+    };
     const close = () => { results.replaceChildren(); results.hidden = true; input.setAttribute('aria-expanded', 'false'); };
     const highlight = (element: HTMLElement, text: string, query: string) => {
       element.replaceChildren();
@@ -174,11 +185,16 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
         link.className = 'top-search-result';
         // Encode each path segment independently so nested post IDs keep their `/` separators.
         const postPath = match.id.split('/').map((segment) => encodeURIComponent(segment)).join('/');
-        link.href = `/posts/${postPath}`;
+        link.href = `/posts/${postPath}/`;
         link.setAttribute('role', 'option');
         link.innerHTML = '<strong></strong><span></span>';
         highlight(link.querySelector('strong'), match.title, query);
         highlight(link.querySelector('span'), `${match.category} · ${match.description}`, query);
+        link.addEventListener('click', () => {
+          input.value = '';
+          close();
+          setExpanded(false);
+        });
         return link;
       }));
       results.hidden = matches.length === 0;
@@ -186,9 +202,15 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     };
     input.addEventListener('input', () => { const query = input.value.trim(); if (query.length < 1) return close(); render(query); });
     input.addEventListener('focus', () => { if (input.value.trim()) render(input.value.trim()); });
-    document.addEventListener('pointerdown', (event) => { if (!search.contains(event.target as Node)) close(); });
-    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); input.blur(); } });
+    document.addEventListener('pointerdown', (event) => {
+      if (search.contains(event.target as Node)) return;
+      close();
+      setExpanded(false);
+    });
+    toggle?.addEventListener('click', () => setExpanded(true));
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); input.blur(); setExpanded(false); } });
     close();
+    setExpanded(false);
   };
 
   const bindTopBars = () => {
@@ -227,6 +249,10 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
 </script>
 
 <style is:global>
+  .top-search { position: relative; }
+  .top-search-field { position: relative; }
+  .mobile-search-toggle { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: .4rem; background: rgba(4,10,18,.32); color: #e8f8ff; font-size: 1rem; cursor: pointer; }
+  .mobile-search-toggle:focus-visible { outline: 2px solid rgba(186,230,253,.85); outline-offset: 2px; }
   .top-search-input { width: 10rem; border: 1px solid rgba(255,255,255,.25); border-radius: .4rem; background: rgba(4,10,18,.42); color: white; padding: .45rem .7rem; font-size: .75rem; outline: none; }
   .top-search-input::placeholder { color: rgba(226,232,240,.68); }
   .top-search-input:focus { border-color: rgba(186,230,253,.85); box-shadow: 0 0 0 2px rgba(186,230,253,.15); }
@@ -239,5 +265,14 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
   .top-search-result strong { color: #f4f8fb; font-size: .78rem; line-height: 1.45; }
   .top-search-result span { margin-top: .25rem; color: rgba(226,232,240,.82); font-size: .68rem; line-height: 1.45; }
   .top-search-result mark { border-radius: .2rem; background: rgba(250, 204, 21, .55); color: #172b3d; padding: .02rem .16rem; box-shadow: 0 0 0 1px rgba(217, 165, 0, .25); }
-  @media (max-width: 767px) { .top-search-input { width: clamp(5.5rem, 30vw, 10rem); } .brand strong { max-width: clamp(4.5rem, 25vw, 9rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .brand small { display: none; } .brand-mark { width: clamp(1.9rem, 8vw, 2.25rem); height: clamp(1.9rem, 8vw, 2.25rem); } }
+  @media (min-width: 768px) { .mobile-search-toggle { display: none; } }
+  @media (max-width: 767px) {
+    .top-search-field { display: none; }
+    .top-search.is-expanded .top-search-field { display: block; }
+    .top-search.is-expanded .mobile-search-toggle { display: none; }
+    .top-search.is-expanded .top-search-input { width: min(11rem, calc(100vw - 8rem)); }
+    .brand strong { max-width: clamp(4.5rem, 25vw, 9rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .brand small { display: none; }
+    .brand-mark { width: clamp(1.9rem, 8vw, 2.25rem); height: clamp(1.9rem, 8vw, 2.25rem); }
+  }
 </style>
