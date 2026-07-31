@@ -37,6 +37,10 @@ const POINTER_RIPPLE_INTERVAL = 0.065;
 const POINTER_RIPPLE_MIN_DISTANCE = 12;
 const POINTER_STROKE_RESET_DELAY = 0.18;
 const POINTER_SEGMENT_MAX_LENGTH = 5;
+// Keep GPU time uniforms small enough to preserve sub-frame precision after
+// the page has been open for hours. All relative timestamps are rebased with
+// the same offset, so animation ages remain continuous.
+const TIME_REBASE_INTERVAL_SECONDS = 256;
 const WATER_WIDTH = 420;
 const WATER_LENGTH = 520;
 const LIGHT_SCREEN_NDC = new THREE.Vector3(-1, 1, 0.15);
@@ -1476,12 +1480,33 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     let waveAccumulator = 0;
     let waveLastElapsed = 0;
 
+    const rebaseTimeline = (elapsed: number) => {
+      const offset = Math.floor(elapsed / TIME_REBASE_INTERVAL_SECONDS)
+        * TIME_REBASE_INTERVAL_SECONDS;
+      if (offset <= 0) return elapsed;
+
+      startedAt += offset;
+      introStartedAt += offset;
+      waveLastElapsed = Math.max(waveLastElapsed - offset, 0);
+      if (impactTime !== null) impactTime -= offset;
+      waveUniforms.uImpactStart.value -= offset;
+
+      heightUniforms.uPointerRipples.value.forEach((ripple) => {
+        ripple.z -= offset;
+      });
+      pointerSprayStates.forEach((particle) => {
+        particle.bornAt -= offset;
+      });
+
+      return elapsed - offset;
+    };
+
     const render = () => {
       animationFrame = requestAnimationFrame(render);
       const now = performance.now() / 1000;
       if (now - lastRenderedAt < 1 / 30 - 0.001) return;
       lastRenderedAt = now;
-      const elapsed = now - startedAt;
+      const elapsed = rebaseTimeline(now - startedAt);
       const introElapsed = now - introStartedAt;
 
       heightUniforms.uTime.value = elapsed;
