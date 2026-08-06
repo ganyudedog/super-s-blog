@@ -12,9 +12,5 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss(), glsl()],
-    optimizeDeps: {
-      force: true,
-      include: ['three', 'react', 'react-dom', 'react-dom/client'],
-    },
   },
 });

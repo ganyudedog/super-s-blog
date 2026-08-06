@@ -52,11 +52,21 @@ import Comments from '../components/comments/Comments.astro';
       )}
     </section>
 
-    <section class="mt-7 border-t border-dashed border-white/25 pt-5" aria-labelledby="friend-apply-title">
-      <h2 id="friend-apply-title" class="m-0 text-base font-semibold text-slate-100">添加友链</h2>
-      <p class="mb-0 mt-2 max-w-[68ch] text-sm leading-7 text-slate-200/90">
-        友链申请暂未开放。后续开放时，为了方便确认，请附上以下信息：
+    <section class="mt-7 border-t border-dashed border-white/25 pt-5" aria-labelledby="friend-exchange-title">
+      <h2 id="friend-exchange-title" class="m-0 text-base font-semibold text-slate-100">关于友链交换</h2>
+      <p class="mb-0 mt-2 text-sm leading-7 text-slate-200/90">
+        交换链接这件事，对我而言，有点像在各自的地图上点亮一个友好据点。不需要什么神圣仪式，也不用互吹彩虹屁。简单地把对方的名字挂在小站的角落里，偶尔路过时点进去看一眼：“哦，这家伙还活着，并且又在碎碎念了。”——这种淡淡的连接感，就很好。
       </p>
+
+      <h2 id="friend-rules-title" class="m-0 mt-6 text-base font-semibold text-slate-100">交换规则以及申请格式</h2>
+      <ul class="mt-3 grid list-none gap-2 p-0 text-sm text-slate-50">
+        <li class="route-item friend-card rounded-lg border border-white/25 px-3 py-2"><span class="mr-2 text-cyan-100">01</span>您的网站有正式的域名并且有定期更新和维护</li>
+        <li class="route-item friend-card rounded-lg border border-white/25 px-3 py-2"><span class="mr-2 text-amber-100">02</span>您的网站内容不违反中华人民共和国国家法律</li>
+        <li class="route-item friend-card rounded-lg border border-white/25 px-3 py-2"><span class="mr-2 text-rose-100">03</span>先为您的网站添加本站友链</li>
+        <li class="route-item friend-card rounded-lg border border-white/25 px-3 py-2"><span class="mr-2 text-emerald-100">04</span>不接受纯商业推广、采集站、或包含敏感内容的站点</li>
+      </ul>
+
+      <p class="mb-0 mt-4 text-sm leading-7 text-slate-200/90">申请时请提供以下信息，方便我确认并添加：</p>
       <ul class="mt-3 grid list-none gap-2 p-0 text-sm sm:grid-cols-2">
         <li class="route-item friend-card rounded-lg border border-white/25 px-3 py-2 text-slate-50"><span class="mr-2 text-cyan-100">01</span>站点名称</li>
         <li class="route-item friend-card rounded-lg border border-white/25 px-3 py-2 text-slate-50"><span class="mr-2 text-amber-100">02</span>站点地址</li>
@@ -97,6 +107,14 @@ import Comments from '../components/comments/Comments.astro';
           </div>
         </dl>
       </aside>
+
+      <div class="mt-6 border-t border-dashed border-white/25 pt-5" aria-labelledby="friend-apply-title">
+        <h2 id="friend-apply-title" class="m-0 text-base font-semibold text-slate-100">申请方式</h2>
+        <p class="mb-0 mt-2 text-sm leading-7 text-slate-200/90">
+          可以直接在<a class="text-cyan-100! underline! decoration-cyan-100/50 underline-offset-4 transition hover:text-cyan-50" href="#comments-title-friends">当前页面的评论区</a>留言，也可以通过
+          <a class="text-cyan-100! underline! decoration-cyan-100/50 underline-offset-4 transition hover:text-cyan-50" href="mailto:2655314552@qq.com">邮件</a>联系我。
+        </p>
+      </div>
     </section>
     <Comments targetId="friends" />
   </article>
