@@ -69,6 +69,12 @@ export const friendItems:FriendItem[] = [
     description: '喜欢创作',
     href: 'https://bakkac.github.io/BakkacBlog/',
     avatar: 'https://bakkac.github.io/BakkacBlog/kumiko.jpg'
+  },
+  {
+    name: '冰霓Iceneon',
+    description: '你好啊，很高心认识你。',
+    href: 'https://iceneoning-blog.pages.dev/',
+    avatar: 'https://iceneoning-blog.pages.dev/_astro/demo-avatar.kkK7ZTBf_Z2qnzaJ.webp'
   }
 ];
 
