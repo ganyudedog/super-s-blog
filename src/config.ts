@@ -35,6 +35,7 @@ export const tagColors = {
   react: 'border-blue-200/70 text-blue-100',
   live2d: 'border-fuchsia-200/70 text-fuchsia-100',
   graphic: 'border-orange-200/70 text-orange-100',
+  work: 'border-rose-200/70 text-rose-100',
 } as const;
 
 export const defaultTagColor = 'border-slate-200/60 text-slate-100';
