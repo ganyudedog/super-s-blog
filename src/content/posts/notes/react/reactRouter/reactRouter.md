@@ -3,7 +3,7 @@ title: React Router 的路由机制与通用前端路由方案
 published: 2025-10-15
 description: 对前端路由的探讨以及对react router的学习
 category: Notes
-tags: [frondend, typescript, react]
+tags: [frontend, typescript, react]
 draft: false
 ---
 

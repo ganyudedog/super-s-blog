@@ -3,7 +3,7 @@ title: Redux 设计思想与工作原理
 published: 2025-10-25
 description: 对redux设计理念以及如何开发其拓展的学习
 category: Notes
-tags: [frondend, typescript, react]
+tags: [frontend, typescript, react]
 draft: false
 ---
 

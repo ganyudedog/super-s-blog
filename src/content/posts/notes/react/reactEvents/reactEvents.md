@@ -3,7 +3,7 @@ title: React 事件系统（基于 React 18 / 现代事件系统源码视角）
 published: 2025-10-18
 description: 对react事件系统的深入解析以及自己的理解
 category: Notes
-tags: [frondend, typescript, react]
+tags: [frontend, typescript, react]
 draft: false
 ---
 

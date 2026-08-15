@@ -27,7 +27,7 @@ export const navItems = [
 // 标签颜色只控制文字和边框；新增标签时在这里补充即可。
 export const tagColors = {
   browser: 'border-cyan-200/70 text-cyan-100',
-  frondend: 'border-pink-200/70 text-pink-100',
+  frontend: 'border-pink-200/70 text-pink-100',
   kernel: 'border-violet-200/70 text-violet-100',
   leetcode: 'border-amber-200/70 text-amber-100',
   think: 'border-emerald-200/70 text-emerald-100',
@@ -36,6 +36,7 @@ export const tagColors = {
   live2d: 'border-fuchsia-200/70 text-fuchsia-100',
   graphic: 'border-orange-200/70 text-orange-100',
   work: 'border-rose-200/70 text-rose-100',
+  rent: 'border-amber-200/70 text-amber-100',
 } as const;
 
 export const defaultTagColor = 'border-slate-200/60 text-slate-100';

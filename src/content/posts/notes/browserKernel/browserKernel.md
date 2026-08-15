@@ -3,7 +3,7 @@ title: 关于1px在浏览器页面上的绘制
 published: 2025-12-30
 description: 对于浏览器内核的部分学习
 category: Notes
-tags: [browser, frondend, kernel]
+tags: [browser, frontend, kernel]
 draft: false
 ---
 

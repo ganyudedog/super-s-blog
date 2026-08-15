@@ -3,7 +3,7 @@ title: react fiber架构
 published: 2025-10-08
 description: 对react底层结构的深入了解
 category: Notes
-tags: [browser, frondend, kernel]
+tags: [browser, frontend, kernel]
 draft: false
 ---
 

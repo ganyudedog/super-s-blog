@@ -337,6 +337,28 @@ html.nav-drawer-open {
   transform: translateY(-2px);
 }
 
+.stats-tag-link.is-active {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, currentColor 24%, transparent),
+    color-mix(in srgb, currentColor 24%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 100% 100%;
+  animation: stats-tag-fill 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes stats-tag-fill {
+  0% {
+    background-size: 0 100%;
+  }
+
+  100% {
+    background-size: 100% 100%;
+  }
+}
+
 @keyframes panelLightSweep {
   0% {
     transform: translateX(-130%);
