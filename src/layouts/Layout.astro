@@ -107,6 +107,70 @@ const tagCount = Object.keys(tagColors).length;
 			import { gsap } from 'gsap';
 			import { swapFunctions } from 'astro:transitions/client';
 
+			const routeCache = new Map<string, HTMLElement>();
+			const routeTitles = new Map<string, string>();
+			let routeCacheBound = false;
+
+			const routeKey = (url = window.location.href) => {
+				const parsed = new URL(url, window.location.href);
+				return `${parsed.pathname}${parsed.search}`;
+			};
+
+			const cacheCurrentRoute = () => {
+				const route = document.querySelector<HTMLElement>('.route-panel');
+				if (route) routeCache.set(routeKey(), route);
+			};
+
+			const dispatchPageLoad = () => {
+				document.dispatchEvent(new Event('astro:page-load'));
+			};
+
+			const restoreCachedRoute = (url: string, mode: 'push' | 'replace' = 'push') => {
+				const cached = routeCache.get(routeKey(url));
+				const current = document.querySelector<HTMLElement>('.route-panel');
+				if (!cached || !current) return false;
+
+				cacheCurrentRoute();
+				current.replaceWith(cached);
+				window.history[mode === 'push' ? 'pushState' : 'replaceState']({}, '', url);
+				const cachedTitle = routeTitles.get(routeKey(url));
+				if (cachedTitle) document.title = cachedTitle;
+				dispatchPageLoad();
+				return true;
+			};
+
+			const ensureBackgroundVideoSource = () => {
+				const video = document.querySelector<HTMLVideoElement>('#background-video');
+				if (!video || video.currentSrc || video.src) return;
+				const mobile = window.matchMedia('(max-width: 767px)').matches;
+				const source = mobile ? video.dataset.videoMobile : video.dataset.videoDesktop;
+				if (!source) return;
+				video.src = source;
+				video.load();
+			};
+
+			const bindRouteCache = () => {
+				if (!routeCache.has(routeKey())) cacheCurrentRoute();
+				if (routeCacheBound) return;
+				routeCacheBound = true;
+
+				document.addEventListener('click', (event) => {
+					if (!(event.target instanceof Element)) return;
+					const link = event.target.closest<HTMLAnchorElement>('a[href]');
+					if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+					const target = new URL(link.href, window.location.href);
+					if (target.origin !== window.location.origin || target.hash || target.pathname === window.location.pathname && target.search === window.location.search) return;
+					if (!routeCache.has(`${target.pathname}${target.search}`)) return;
+					event.preventDefault();
+					restoreCachedRoute(target.href);
+				}, { capture: true });
+
+				window.addEventListener('popstate', () => {
+					if (restoreCachedRoute(window.location.href, 'replace')) return;
+					window.location.reload();
+				});
+			};
+
 			const loadArticleMedia = () => {
 				document.querySelectorAll<HTMLAudioElement>('.article-prose audio').forEach((audio) => {
 					if (audio.dataset.routeMediaLoaded === 'true') return;
@@ -192,13 +256,19 @@ const tagCount = Object.keys(tagColors).length;
 
 			document.addEventListener('astro:page-load', bindScrollChrome);
 			document.addEventListener('astro:page-load', loadArticleMedia);
+			document.addEventListener('astro:page-load', ensureBackgroundVideoSource);
+			document.addEventListener('astro:page-load', bindRouteCache);
 			bindScrollChrome();
 			loadArticleMedia();
+			ensureBackgroundVideoSource();
+			bindRouteCache();
 
 			document.addEventListener('astro:before-swap', (event) => {
 				const currentRoute = document.querySelector<HTMLElement>('.route-panel');
 				const nextRoute = event.newDocument.querySelector<HTMLElement>('.route-panel');
 				if (!currentRoute || !nextRoute) return;
+				cacheCurrentRoute();
+				routeTitles.set(routeKey(event.newDocument.URL), event.newDocument.title);
 
 				// The WebGL layers stay live in the current document. Avoid covering them
 				// with a root view-transition snapshot while only the route panel changes.
@@ -216,6 +286,8 @@ const tagCount = Object.keys(tagColors).length;
 			});
 
 			document.addEventListener('astro:after-swap', () => {
+				cacheCurrentRoute();
+				ensureBackgroundVideoSource();
 				loadArticleMedia();
 				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 				const route = document.querySelector<HTMLElement>('.route-panel');
