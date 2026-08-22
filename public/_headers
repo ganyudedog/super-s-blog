@@ -1,10 +1,13 @@
-/background/*.mp4
-  Cache-Control: public, max-age=31536000, immutable
-
-/background/*.jpg
+/background/*
   Cache-Control: public, max-age=31536000, immutable
 
 /image/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/audio/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/live2d/*
   Cache-Control: public, max-age=31536000, immutable
 
 /_astro/*

@@ -109,7 +109,11 @@ const tagCount = Object.keys(tagColors).length;
 
 			const routeCache = new Map<string, HTMLElement>();
 			const routeTitles = new Map<string, string>();
+			const MAX_CACHED_ROUTES = 5;
 			let routeCacheBound = false;
+			let navigationLocked = false;
+			let navigationUnlockTimer = 0;
+			const NAVIGATION_THROTTLE_MS = 1800;
 
 			const routeKey = (url = window.location.href) => {
 				const parsed = new URL(url, window.location.href);
@@ -118,7 +122,16 @@ const tagCount = Object.keys(tagColors).length;
 
 			const cacheCurrentRoute = () => {
 				const route = document.querySelector<HTMLElement>('.route-panel');
-				if (route) routeCache.set(routeKey(), route);
+				if (!route) return;
+				const key = routeKey();
+				routeCache.delete(key);
+				routeCache.set(key, route);
+				while (routeCache.size > MAX_CACHED_ROUTES) {
+					const oldestKey = routeCache.keys().next().value;
+					if (oldestKey === undefined) break;
+					routeCache.delete(oldestKey);
+					routeTitles.delete(oldestKey);
+				}
 			};
 
 			const dispatchPageLoad = () => {
@@ -132,11 +145,27 @@ const tagCount = Object.keys(tagColors).length;
 
 				cacheCurrentRoute();
 				current.replaceWith(cached);
+				const targetKey = routeKey(url);
+				routeCache.delete(targetKey);
+				routeCache.set(targetKey, cached);
 				window.history[mode === 'push' ? 'pushState' : 'replaceState']({}, '', url);
 				const cachedTitle = routeTitles.get(routeKey(url));
 				if (cachedTitle) document.title = cachedTitle;
 				dispatchPageLoad();
 				return true;
+			};
+
+			const releaseNavigationLock = () => {
+				navigationLocked = false;
+				window.clearTimeout(navigationUnlockTimer);
+				document.documentElement.removeAttribute('data-navigation-busy');
+			};
+
+			const startNavigationLock = () => {
+				navigationLocked = true;
+				document.documentElement.setAttribute('data-navigation-busy', 'true');
+				window.clearTimeout(navigationUnlockTimer);
+				navigationUnlockTimer = window.setTimeout(releaseNavigationLock, NAVIGATION_THROTTLE_MS);
 			};
 
 			const ensureBackgroundVideoSource = () => {
@@ -160,12 +189,22 @@ const tagCount = Object.keys(tagColors).length;
 					if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 					const target = new URL(link.href, window.location.href);
 					if (target.origin !== window.location.origin || target.hash || target.pathname === window.location.pathname && target.search === window.location.search) return;
-					if (!routeCache.has(`${target.pathname}${target.search}`)) return;
-					event.preventDefault();
-					restoreCachedRoute(target.href);
+					const targetKey = `${target.pathname}${target.search}`;
+					if (routeCache.has(targetKey)) {
+						event.preventDefault();
+						releaseNavigationLock();
+						restoreCachedRoute(target.href);
+						return;
+					}
+					if (navigationLocked) {
+						event.preventDefault();
+						return;
+					}
+					startNavigationLock();
 				}, { capture: true });
 
 				window.addEventListener('popstate', () => {
+					releaseNavigationLock();
 					if (restoreCachedRoute(window.location.href, 'replace')) return;
 					window.location.reload();
 				});
@@ -258,6 +297,7 @@ const tagCount = Object.keys(tagColors).length;
 			document.addEventListener('astro:page-load', loadArticleMedia);
 			document.addEventListener('astro:page-load', ensureBackgroundVideoSource);
 			document.addEventListener('astro:page-load', bindRouteCache);
+			document.addEventListener('astro:after-swap', releaseNavigationLock);
 			bindScrollChrome();
 			loadArticleMedia();
 			ensureBackgroundVideoSource();
