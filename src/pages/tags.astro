@@ -11,7 +11,7 @@ const posts = (await getCollection('posts', ({ data }) => !data.draft))
   <header class="mb-5 px-1 text-slate-100">
     <p class="mb-1 text-[0.62rem] font-extrabold tracking-[0.14em] text-cyan-200/85">TAGS</p>
     <h1 class="m-0 text-3xl font-semibold" data-tag-title>标签文章</h1>
-    <p class="mt-2 text-sm text-slate-300" data-tag-description>全部已发布文章，按发布时间由新到旧排列。</p>
+    <p class="mt-2 text-sm text-slate-300" data-tag-description>请选择一个标签以筛选已发布文章。</p>
   </header>
 
   <div class="grid gap-3" data-tag-post-list>
@@ -27,32 +27,3 @@ const posts = (await getCollection('posts', ({ data }) => !data.draft))
     <p class="mb-0 mt-3 text-sm leading-7">这个标签暂时还没有关联已发布的文章。</p>
   </section>
 </ContentLayout>
-
-<script>
-  const updateTagResults = () => {
-    const selectedTag = new URLSearchParams(window.location.search).get('tag')?.trim() ?? '';
-    const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-tag-post]'));
-    const title = document.querySelector<HTMLElement>('[data-tag-title]');
-    const description = document.querySelector<HTMLElement>('[data-tag-description]');
-    const empty = document.querySelector<HTMLElement>('[data-tag-empty]');
-
-    let visibleCount = 0;
-    cards.forEach((card) => {
-      const tags = (card.dataset.tags ?? '').split(',').filter(Boolean);
-      const visible = !selectedTag || tags.includes(selectedTag);
-      card.hidden = !visible;
-      if (visible) visibleCount += 1;
-    });
-
-    if (title) title.textContent = selectedTag ? `标签：${selectedTag}` : '标签文章';
-    if (description) {
-      description.textContent = selectedTag
-        ? `与“${selectedTag}”关联的已发布文章，按发布时间由新到旧排列。`
-        : '全部已发布文章，按发布时间由新到旧排列。';
-    }
-    if (empty) empty.hidden = visibleCount > 0;
-  };
-
-  updateTagResults();
-  document.addEventListener('astro:page-load', updateTagResults);
-</script>

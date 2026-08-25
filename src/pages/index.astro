@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import HomeView from '../components/home/HomeView.astro';
 ---
 
-<Layout intro>
+<Layout intro={Astro.url.pathname === '/'}>
 	<HomeView />
 </Layout>
 
@@ -15,5 +15,5 @@ import HomeView from '../components/home/HomeView.astro';
 			window.history.replaceState(window.history.state, '', '/index/');
 		}
 	}, { once: true });
-	initHomeReveal();
+	if (window.location.pathname === '/') initHomeReveal();
 </script>

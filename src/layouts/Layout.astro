@@ -170,12 +170,14 @@ const tagCount = Object.keys(tagColors).length;
 
 			const ensureBackgroundVideoSource = () => {
 				const video = document.querySelector<HTMLVideoElement>('#background-video');
-				if (!video || video.currentSrc || video.src) return;
+				if (!video || video.dataset.sourceReady === 'true') return;
 				const mobile = window.matchMedia('(max-width: 767px)').matches;
 				const source = mobile ? video.dataset.videoMobile : video.dataset.videoDesktop;
 				if (!source) return;
+				// Setting the source is enough; the first play() starts the single media request.
+				// Calling load() here and then play() can create a second range request on Pages.
 				video.src = source;
-				video.load();
+				video.dataset.sourceReady = 'true';
 			};
 
 			const bindRouteCache = () => {
@@ -217,6 +219,32 @@ const tagCount = Object.keys(tagColors).length;
 					if (audio.preload === '') audio.preload = 'metadata';
 					audio.load();
 				});
+			};
+
+			const updateTagResults = () => {
+				const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-tag-post]'));
+				if (!cards.length) return;
+
+				const selectedTag = new URLSearchParams(window.location.search).get('tag')?.trim() ?? '';
+				const title = document.querySelector<HTMLElement>('[data-tag-title]');
+				const description = document.querySelector<HTMLElement>('[data-tag-description]');
+				const empty = document.querySelector<HTMLElement>('[data-tag-empty]');
+				let visibleCount = 0;
+
+				cards.forEach((card) => {
+					const tags = (card.dataset.tags ?? '').split(',').filter(Boolean);
+					const visible = Boolean(selectedTag) && tags.includes(selectedTag);
+					card.hidden = !visible;
+					if (visible) visibleCount += 1;
+				});
+
+				if (title) title.textContent = selectedTag ? `标签：${selectedTag}` : '标签文章';
+				if (description) {
+					description.textContent = selectedTag
+						? `与“${selectedTag}”关联的已发布文章，按发布时间由新到旧排列。`
+						: '请选择一个标签以筛选已发布文章。';
+				}
+				if (empty) empty.hidden = visibleCount > 0 || !selectedTag;
 			};
 
 			const bindScrollChrome = () => {
@@ -295,11 +323,13 @@ const tagCount = Object.keys(tagColors).length;
 
 			document.addEventListener('astro:page-load', bindScrollChrome);
 			document.addEventListener('astro:page-load', loadArticleMedia);
+			document.addEventListener('astro:page-load', updateTagResults);
 			document.addEventListener('astro:page-load', ensureBackgroundVideoSource);
 			document.addEventListener('astro:page-load', bindRouteCache);
 			document.addEventListener('astro:after-swap', releaseNavigationLock);
 			bindScrollChrome();
 			loadArticleMedia();
+			updateTagResults();
 			ensureBackgroundVideoSource();
 			bindRouteCache();
 
@@ -329,6 +359,7 @@ const tagCount = Object.keys(tagColors).length;
 				cacheCurrentRoute();
 				ensureBackgroundVideoSource();
 				loadArticleMedia();
+				updateTagResults();
 				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 				const route = document.querySelector<HTMLElement>('.route-panel');
 				if (!route) return;
