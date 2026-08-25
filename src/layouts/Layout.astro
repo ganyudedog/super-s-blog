@@ -67,14 +67,6 @@ const tagCount = Object.keys(tagColors).length;
 			/>
 			<TopBar
 				revealed={!intro}
-				searchPosts={posts.map((post) => ({
-					id: post.id,
-					title: post.data.title,
-					description: post.data.description,
-					category: post.data.category,
-					tags: post.data.tags,
-					body: post.body ?? '',
-				}))}
 			/>
 			<main
 				class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-8 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
@@ -105,15 +97,17 @@ const tagCount = Object.keys(tagColors).length;
 		</div>
 		<script>
 			import { gsap } from 'gsap';
-			import { swapFunctions } from 'astro:transitions/client';
+			import { initBackgroundVideo } from '../scripts/backgroundVideo';
 
 			const routeCache = new Map<string, HTMLElement>();
 			const routeTitles = new Map<string, string>();
 			const MAX_CACHED_ROUTES = 5;
 			let routeCacheBound = false;
 			let navigationLocked = false;
-			let navigationUnlockTimer = 0;
-			const NAVIGATION_THROTTLE_MS = 1800;
+			let navigationWatchdog = 0;
+			let resolveNavigation: (() => void) | null = null;
+			let navigationCompletion: Promise<void> | null = null;
+			const NAVIGATION_WATCHDOG_MS = 30000;
 
 			const routeKey = (url = window.location.href) => {
 				const parsed = new URL(url, window.location.href);
@@ -126,6 +120,7 @@ const tagCount = Object.keys(tagColors).length;
 				const key = routeKey();
 				routeCache.delete(key);
 				routeCache.set(key, route);
+				routeTitles.set(key, document.title);
 				while (routeCache.size > MAX_CACHED_ROUTES) {
 					const oldestKey = routeCache.keys().next().value;
 					if (oldestKey === undefined) break;
@@ -134,8 +129,12 @@ const tagCount = Object.keys(tagColors).length;
 				}
 			};
 
-			const dispatchPageLoad = () => {
-				document.dispatchEvent(new Event('astro:page-load'));
+			const setRouteActive = (route: HTMLElement, active: boolean) => {
+				route.inert = !active;
+				route.dataset.routeState = active ? 'active' : 'inactive';
+				if (!active) {
+					route.querySelectorAll<HTMLMediaElement>('audio, video').forEach((media) => media.pause());
+				}
 			};
 
 			const restoreCachedRoute = (url: string, mode: 'push' | 'replace' = 'push') => {
@@ -144,40 +143,51 @@ const tagCount = Object.keys(tagColors).length;
 				if (!cached || !current) return false;
 
 				cacheCurrentRoute();
+				setRouteActive(current, false);
 				current.replaceWith(cached);
+				setRouteActive(cached, true);
 				const targetKey = routeKey(url);
 				routeCache.delete(targetKey);
 				routeCache.set(targetKey, cached);
 				window.history[mode === 'push' ? 'pushState' : 'replaceState']({}, '', url);
 				const cachedTitle = routeTitles.get(routeKey(url));
 				if (cachedTitle) document.title = cachedTitle;
-				dispatchPageLoad();
+				document.dispatchEvent(new CustomEvent('route:activated', { detail: { url: targetKey } }));
+				bindScrollChrome();
+				loadArticleMedia();
+				updateTagResults();
 				return true;
 			};
 
-			const releaseNavigationLock = () => {
+			const clearNavigationLock = () => {
 				navigationLocked = false;
-				window.clearTimeout(navigationUnlockTimer);
+				window.clearTimeout(navigationWatchdog);
+				navigationCompletion = null;
 				document.documentElement.removeAttribute('data-navigation-busy');
 			};
 
 			const startNavigationLock = () => {
+				if (navigationCompletion) return navigationCompletion;
 				navigationLocked = true;
 				document.documentElement.setAttribute('data-navigation-busy', 'true');
-				window.clearTimeout(navigationUnlockTimer);
-				navigationUnlockTimer = window.setTimeout(releaseNavigationLock, NAVIGATION_THROTTLE_MS);
+				navigationCompletion = new Promise<void>((resolve) => {
+					resolveNavigation = resolve;
+				}).finally(clearNavigationLock);
+				window.clearTimeout(navigationWatchdog);
+				navigationWatchdog = window.setTimeout(() => resolveNavigation?.(), NAVIGATION_WATCHDOG_MS);
+				return navigationCompletion;
+			};
+
+			const completeNavigation = () => {
+				const resolve = resolveNavigation;
+				resolveNavigation = null;
+				resolve?.();
 			};
 
 			const ensureBackgroundVideoSource = () => {
 				const video = document.querySelector<HTMLVideoElement>('#background-video');
-				if (!video || video.dataset.sourceReady === 'true') return;
-				const mobile = window.matchMedia('(max-width: 767px)').matches;
-				const source = mobile ? video.dataset.videoMobile : video.dataset.videoDesktop;
-				if (!source) return;
-				// Setting the source is enough; the first play() starts the single media request.
-				// Calling load() here and then play() can create a second range request on Pages.
-				video.src = source;
-				video.dataset.sourceReady = 'true';
+				if (!video) return;
+				initBackgroundVideo(video);
 			};
 
 			const bindRouteCache = () => {
@@ -185,31 +195,25 @@ const tagCount = Object.keys(tagColors).length;
 				if (routeCacheBound) return;
 				routeCacheBound = true;
 
-				document.addEventListener('click', (event) => {
+				window.addEventListener('click', (event) => {
 					if (!(event.target instanceof Element)) return;
 					const link = event.target.closest<HTMLAnchorElement>('a[href]');
 					if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 					const target = new URL(link.href, window.location.href);
 					if (target.origin !== window.location.origin || target.hash || target.pathname === window.location.pathname && target.search === window.location.search) return;
-					const targetKey = `${target.pathname}${target.search}`;
-					if (routeCache.has(targetKey)) {
-						event.preventDefault();
-						releaseNavigationLock();
-						restoreCachedRoute(target.href);
-						return;
-					}
 					if (navigationLocked) {
 						event.preventDefault();
 						return;
 					}
-					startNavigationLock();
+					void startNavigationLock();
+					const targetKey = `${target.pathname}${target.search}`;
+					if (routeCache.has(targetKey)) {
+						event.preventDefault();
+						restoreCachedRoute(target.href);
+						completeNavigation();
+						return;
+					}
 				}, { capture: true });
-
-				window.addEventListener('popstate', () => {
-					releaseNavigationLock();
-					if (restoreCachedRoute(window.location.href, 'replace')) return;
-					window.location.reload();
-				});
 			};
 
 			const loadArticleMedia = () => {
@@ -217,7 +221,6 @@ const tagCount = Object.keys(tagColors).length;
 					if (audio.dataset.routeMediaLoaded === 'true') return;
 					audio.dataset.routeMediaLoaded = 'true';
 					if (audio.preload === '') audio.preload = 'metadata';
-					audio.load();
 				});
 			};
 
@@ -326,7 +329,7 @@ const tagCount = Object.keys(tagColors).length;
 			document.addEventListener('astro:page-load', updateTagResults);
 			document.addEventListener('astro:page-load', ensureBackgroundVideoSource);
 			document.addEventListener('astro:page-load', bindRouteCache);
-			document.addEventListener('astro:after-swap', releaseNavigationLock);
+			document.addEventListener('astro:page-load', completeNavigation);
 			bindScrollChrome();
 			loadArticleMedia();
 			updateTagResults();
@@ -338,21 +341,8 @@ const tagCount = Object.keys(tagColors).length;
 				const nextRoute = event.newDocument.querySelector<HTMLElement>('.route-panel');
 				if (!currentRoute || !nextRoute) return;
 				cacheCurrentRoute();
+				setRouteActive(currentRoute, false);
 				routeTitles.set(routeKey(event.newDocument.URL), event.newDocument.title);
-
-				// The WebGL layers stay live in the current document. Avoid covering them
-				// with a root view-transition snapshot while only the route panel changes.
-				void event.viewTransition.ready.catch(() => undefined);
-				void event.viewTransition.finished.catch(() => undefined);
-				void event.viewTransition.updateCallbackDone.catch(() => undefined);
-				event.viewTransition.skipTransition();
-
-				event.swap = () => {
-					swapFunctions.deselectScripts(event.newDocument);
-					swapFunctions.swapRootAttributes(event.newDocument);
-					swapFunctions.swapHeadElements(event.newDocument);
-					currentRoute.replaceWith(nextRoute);
-				};
 			});
 
 			document.addEventListener('astro:after-swap', () => {

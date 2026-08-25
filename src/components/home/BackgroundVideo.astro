@@ -29,8 +29,10 @@ const { revealed = false } = Astro.props;
     disablepictureinpicture
     controlslist="nodownload noplaybackrate nofullscreen"
     tabindex="-1"
-    data-video-desktop="/background/WUWA-desktop.mp4"
-    data-video-mobile="/background/WUWA-mobile.mp4"
+    data-hls-desktop="/background/hls/desktop/master.m3u8"
+    data-hls-mobile="/background/hls/mobile/master.m3u8"
+    data-video-desktop="/media/background/WUWA-desktop.mp4"
+    data-video-mobile="/media/background/WUWA-mobile.mp4"
   >
   </video>
   <div class="background-video-grade"></div>

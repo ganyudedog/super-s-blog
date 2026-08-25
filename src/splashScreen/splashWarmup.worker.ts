@@ -47,8 +47,9 @@ self.onmessage = async (event: MessageEvent<WarmupRequest>) => {
       powerPreference: 'high-performance',
     });
     if (!gl) throw new Error('Worker WebGL2 is unavailable.');
+    const activeGl = gl;
 
-    const parallel = gl.getExtension('KHR_parallel_shader_compile') as
+    const parallel = activeGl.getExtension('KHR_parallel_shader_compile') as
       | { COMPLETION_STATUS_KHR: number }
       | null;
     const linkedPrograms: Array<{
@@ -59,28 +60,28 @@ self.onmessage = async (event: MessageEvent<WarmupRequest>) => {
     }> = [];
 
     for (const source of event.data.programs) {
-      const vertex = compileShader(gl, gl.VERTEX_SHADER, source.vertex);
-      const fragment = compileShader(gl, gl.FRAGMENT_SHADER, source.fragment);
-      const program = gl.createProgram();
+      const vertex = compileShader(activeGl, activeGl.VERTEX_SHADER, source.vertex);
+      const fragment = compileShader(activeGl, activeGl.FRAGMENT_SHADER, source.fragment);
+      const program = activeGl.createProgram();
       if (!program) throw new Error(`Unable to create ${source.name} program.`);
-      gl.attachShader(program, vertex);
-      gl.attachShader(program, fragment);
-      gl.linkProgram(program);
+      activeGl.attachShader(program, vertex);
+      activeGl.attachShader(program, fragment);
+      activeGl.linkProgram(program);
       linkedPrograms.push({ name: source.name, program, vertex, fragment });
     }
 
     await Promise.all(linkedPrograms.map(async ({ name, program }) => {
       try {
-        await waitForProgram(gl, program, parallel?.COMPLETION_STATUS_KHR ?? null);
+        await waitForProgram(activeGl, program, parallel?.COMPLETION_STATUS_KHR ?? null);
       } catch (error) {
         throw new Error(`${name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }));
 
     linkedPrograms.forEach(({ program, vertex, fragment }) => {
-      gl.deleteProgram(program);
-      gl.deleteShader(vertex);
-      gl.deleteShader(fragment);
+      activeGl.deleteProgram(program);
+      activeGl.deleteShader(vertex);
+      activeGl.deleteShader(fragment);
     });
     self.postMessage({
       ok: true,

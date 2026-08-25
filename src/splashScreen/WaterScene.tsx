@@ -304,6 +304,17 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     );
     fallbackVideoTexture.needsUpdate = true;
     fallbackVideoTexture.colorSpace = THREE.SRGBColorSpace;
+    let posterTextureReady = false;
+    const posterTexture = new THREE.TextureLoader().load(
+      '/background/WUWA-poster.jpg',
+      () => { posterTextureReady = true; },
+      undefined,
+      () => { posterTextureReady = false; },
+    );
+    posterTexture.colorSpace = THREE.SRGBColorSpace;
+    posterTexture.minFilter = THREE.LinearFilter;
+    posterTexture.magFilter = THREE.LinearFilter;
+    posterTexture.generateMipmaps = false;
     const videoTexture = backgroundVideo
       ? new THREE.VideoTexture(backgroundVideo)
       : fallbackVideoTexture;
@@ -330,8 +341,10 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       uWaterSize: { value: heightUniforms.uWaterSize.value },
       uWaveState: { value: waveReadTarget.texture },
       uWaveTexel: { value: new THREE.Vector2(1 / waveTargetSize, 1 / waveTargetSize) },
+      uPreviewTexture: { value: posterTexture },
       uVideoTexture: { value: videoTexture },
       uVideoReady: { value: 0 },
+      uVideoBlend: { value: 0 },
       uVideoUvScale: { value: new THREE.Vector2(1, 1) },
       uVideoUvOffset: { value: new THREE.Vector2(0, 0) },
       uResolution: { value: new THREE.Vector2(1, 1) },
@@ -1354,7 +1367,19 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       waterUniforms.uRippleAge.value = -1;
     };
     window.addEventListener('water:intro-skip', handleIntroSkip);
-    let hasDecodedVideoFrame = Boolean(backgroundVideo && backgroundVideo.readyState >= 2);
+    let hasDecodedVideoFrame = false;
+    let videoBlendStartedAt = -1;
+    const supportsVideoFrameCallback = Boolean(
+      backgroundVideo && typeof backgroundVideo.requestVideoFrameCallback === 'function',
+    );
+    if (backgroundVideo && supportsVideoFrameCallback) {
+      backgroundVideo.requestVideoFrameCallback(() => {
+        hasDecodedVideoFrame = true;
+      });
+    }
+    if (backgroundVideo && !supportsVideoFrameCallback && backgroundVideo.readyState >= 2) {
+      hasDecodedVideoFrame = true;
+    }
     let pointerRippleIndex = 0;
     let lastPointerRippleAt = -Infinity;
     let lastPointerX = Number.NaN;
@@ -1515,8 +1540,15 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       splashUniforms.uTime.value = elapsed;
       foamUniforms.uTime.value = elapsed;
       waterUniforms.uRippleAge.value = heightUniforms.uRippleAge.value;
-      if (backgroundVideo && backgroundVideo.readyState >= 2) hasDecodedVideoFrame = true;
-      waterUniforms.uVideoReady.value = hasDecodedVideoFrame ? 1 : 0;
+      if (backgroundVideo && !supportsVideoFrameCallback && backgroundVideo.readyState >= 2) {
+        hasDecodedVideoFrame = true;
+      }
+      if (hasDecodedVideoFrame && videoBlendStartedAt < 0) videoBlendStartedAt = now;
+      const videoBlend = videoBlendStartedAt < 0
+        ? 0
+        : Math.min(1, Math.max(0, (now - videoBlendStartedAt) / 0.36));
+      waterUniforms.uVideoReady.value = posterTextureReady || hasDecodedVideoFrame ? 1 : 0;
+      waterUniforms.uVideoBlend.value = videoBlend;
 
       pointerSprayStates.forEach((particle, index) => {
         const age = elapsed - particle.bornAt;
@@ -1883,7 +1915,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
                 );
               } else {
                 enhancedIdleUsesCallback = false;
-                enhancedIdleHandle = window.setTimeout(() => {
+                enhancedIdleHandle = globalThis.window.setTimeout(() => {
                   enhancedIdleHandle = 0;
                   resolve();
                 }, 120);
@@ -1919,7 +1951,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
           );
         } else {
           enhancedIdleUsesCallback = false;
-          enhancedIdleHandle = window.setTimeout(
+          enhancedIdleHandle = globalThis.window.setTimeout(
             () => {
               enhancedIdleHandle = 0;
               void warmUpEnhancedSplash(source);
@@ -2114,6 +2146,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       glowTexture.dispose();
       environmentTexture.dispose();
       videoTexture.dispose();
+      posterTexture.dispose();
       if (videoTexture !== fallbackVideoTexture) fallbackVideoTexture.dispose();
       (lightGlow.material as THREE.Material).dispose();
       renderer.dispose();

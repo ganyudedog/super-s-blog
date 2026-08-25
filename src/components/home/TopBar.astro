@@ -1,21 +1,11 @@
 ---
 import { navItems, siteConfig } from '../../config';
 
-interface SearchPost {
-	id: string;
-	title: string;
-	description: string;
-	category: string;
-	tags: string[];
-	body: string;
-}
-
 interface Props {
 	revealed?: boolean;
-	searchPosts: SearchPost[];
 }
 
-const { revealed = false, searchPosts } = Astro.props;
+const { revealed = false } = Astro.props;
 const pathname = Astro.url.pathname;
 const isActive = (href: string) => href === '/index/'
   ? pathname === '/' || pathname === '/index' || pathname === '/index/'
@@ -120,12 +110,40 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
   </nav>
 </aside>
 
-<script type="application/json" data-top-search-data set:html={JSON.stringify(searchPosts)}></script>
-
 <script>
   import MiniSearch, { type Query } from 'minisearch';
-  const searchDataElement = document.querySelector('[data-top-search-data]');
-  const searchPosts = searchDataElement ? JSON.parse(searchDataElement.textContent || '[]') : [];
+  interface SearchPost {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    tags: string[];
+    body: string;
+  }
+
+  let searchIndexPromise: Promise<MiniSearch<SearchPost>> | null = null;
+  const getSearchIndex = () => {
+    if (searchIndexPromise) return searchIndexPromise;
+    searchIndexPromise = fetch('/search-index.json')
+      .then((response) => {
+        if (!response.ok) throw new Error(`Search index request failed: ${response.status}`);
+        return response.json() as Promise<SearchPost[]>;
+      })
+      .then((posts) => {
+        const index = new MiniSearch<SearchPost>({
+          fields: ['title', 'description', 'category', 'tags', 'body'],
+          storeFields: ['title', 'description', 'category'],
+          searchOptions: { boost: { title: 5, tags: 2, description: 2 }, prefix: true, fuzzy: 0.2 },
+        });
+        index.addAll(posts);
+        return index;
+      })
+      .catch((error) => {
+        searchIndexPromise = null;
+        throw error;
+      });
+    return searchIndexPromise;
+  };
   const normalizePath = (pathname: string) => {
     const normalized = pathname.replace(/\/+$/, '');
     return normalized || '/';
@@ -154,8 +172,6 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
     const toggle = search?.querySelector<HTMLButtonElement>('[data-mobile-search-toggle]');
     if (!search || !input || !results || search.dataset.searchBound === 'true') return;
     search.dataset.searchBound = 'true';
-    const index = new MiniSearch({ fields: ['title', 'description', 'category', 'tags', 'body'], storeFields: ['title', 'description', 'category'], searchOptions: { boost: { title: 5, tags: 2, description: 2 }, prefix: true, fuzzy: 0.2 } });
-    index.addAll(searchPosts);
     const setExpanded = (expanded: boolean) => {
       search.classList.toggle('is-expanded', expanded);
       toggle?.setAttribute('aria-expanded', String(expanded));
@@ -178,7 +194,18 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
       }
       if (cursor < text.length) element.append(document.createTextNode(text.slice(cursor)));
     };
-    const render = (query: Query) => {
+    let renderSequence = 0;
+    const render = async (query: Query) => {
+      const sequence = ++renderSequence;
+      let index: MiniSearch<SearchPost>;
+      try {
+        index = await getSearchIndex();
+      } catch (error) {
+        console.error('[TopBar] failed to load search index', error);
+        close();
+        return;
+      }
+      if (sequence !== renderSequence || input.value.trim() !== query) return;
       const matches = index.search(query).slice(0, 6);
       results.replaceChildren(...matches.map((match) => {
         const link = document.createElement('a');
@@ -200,8 +227,8 @@ const navLinkClass = 'rounded-md px-3 py-2 text-xs font-semibold transition hove
       results.hidden = matches.length === 0;
       input.setAttribute('aria-expanded', String(matches.length > 0));
     };
-    input.addEventListener('input', () => { const query = input.value.trim(); if (query.length < 1) return close(); render(query); });
-    input.addEventListener('focus', () => { if (input.value.trim()) render(input.value.trim()); });
+    input.addEventListener('input', () => { const query = input.value.trim(); if (query.length < 1) return close(); void render(query); });
+    input.addEventListener('focus', () => { void getSearchIndex().catch(() => undefined); if (input.value.trim()) void render(input.value.trim()); });
     document.addEventListener('pointerdown', (event) => {
       if (search.contains(event.target as Node)) return;
       close();
