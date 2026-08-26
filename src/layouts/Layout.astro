@@ -58,45 +58,42 @@ const tagCount = Object.keys(tagColors).length;
 			{intro && (
 				<div class="home-boot-surface" data-home-boot aria-hidden="true"></div>
 			)}
-			<BackgroundVideo revealed={!intro} />
-			<SplashScreen
-				intro={intro}
-				client:load
-				transition:persist="water-scene"
-				transition:persist-props
-			/>
-			<TopBar
-				revealed={!intro}
-			/>
-			<main
-				class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-8 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
-				data-home-content
-			>
-				<div class="contents md:col-start-1 md:row-start-1 md:grid md:content-start md:gap-5 xl:contents">
-					<PersonalPanel revealed={!intro} />
-					<StatsPanel
-						postCount={posts.length}
-						noteCount={noteCount}
-						tagCount={tagCount}
-						revealed={!intro}
-					/>
-				</div>
-				<slot />
-			</main>
-			<button
-				class="back-to-top"
-				type="button"
-				aria-label="回到页面顶部"
-				title="回到顶部"
-				data-back-to-top
-				data-visible="false"
-				transition:persist="back-to-top"
-			>
-				<span aria-hidden="true">↑</span>
-			</button>
+			<div data-webgl-shell>
+				<BackgroundVideo revealed={!intro} />
+				<SplashScreen intro={intro} client:load />
+			</div>
+			<div data-page-shell>
+				<TopBar revealed={!intro} />
+				<main
+					class="relative z-20 mx-auto grid w-[min(calc(100%-1.5rem),1280px)] grid-cols-1 items-start gap-4 px-0 pb-12 pt-8 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-5 md:px-1 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]"
+					data-home-content
+				>
+					<div class="contents md:col-start-1 md:row-start-1 md:grid md:content-start md:gap-5 xl:contents">
+						<PersonalPanel revealed={!intro} />
+						<StatsPanel
+							postCount={posts.length}
+							noteCount={noteCount}
+							tagCount={tagCount}
+							revealed={!intro}
+						/>
+					</div>
+					<slot />
+				</main>
+				<button
+					class="back-to-top"
+					type="button"
+					aria-label="回到页面顶部"
+					title="回到顶部"
+					data-back-to-top
+					data-visible="false"
+				>
+					<span aria-hidden="true">↑</span>
+				</button>
+			</div>
 		</div>
 		<script>
 			import { gsap } from 'gsap';
+			import { swapFunctions } from 'astro:transitions/client';
 			import { initBackgroundVideo } from '../scripts/backgroundVideo';
 
 			const routeCache = new Map<string, HTMLElement>();
@@ -107,6 +104,7 @@ const tagCount = Object.keys(tagColors).length;
 			let navigationWatchdog = 0;
 			let resolveNavigation: (() => void) | null = null;
 			let navigationCompletion: Promise<void> | null = null;
+			let scrollChromeAbort: AbortController | null = null;
 			const NAVIGATION_WATCHDOG_MS = 30000;
 
 			const routeKey = (url = window.location.href) => {
@@ -114,10 +112,10 @@ const tagCount = Object.keys(tagColors).length;
 				return `${parsed.pathname}${parsed.search}`;
 			};
 
-			const cacheCurrentRoute = () => {
+			const cacheCurrentRoute = (url = window.location.href) => {
 				const route = document.querySelector<HTMLElement>('.route-panel');
 				if (!route) return;
-				const key = routeKey();
+				const key = routeKey(url);
 				routeCache.delete(key);
 				routeCache.set(key, route);
 				routeTitles.set(key, document.title);
@@ -191,9 +189,9 @@ const tagCount = Object.keys(tagColors).length;
 			};
 
 			const bindRouteCache = () => {
-				if (!routeCache.has(routeKey())) cacheCurrentRoute();
 				if (routeCacheBound) return;
 				routeCacheBound = true;
+				cacheCurrentRoute();
 
 				window.addEventListener('click', (event) => {
 					if (!(event.target instanceof Element)) return;
@@ -253,6 +251,9 @@ const tagCount = Object.keys(tagColors).length;
 			const bindScrollChrome = () => {
 				const button = document.querySelector<HTMLButtonElement>('[data-back-to-top]');
 				if (!button || button.dataset.scrollBound === 'true') return;
+				scrollChromeAbort?.abort();
+				scrollChromeAbort = new AbortController();
+				const { signal } = scrollChromeAbort;
 				button.dataset.scrollBound = 'true';
 
 				let frame = 0;
@@ -317,10 +318,10 @@ const tagCount = Object.keys(tagColors).length;
 							scheduleUpdate();
 						},
 					});
-				});
-				window.addEventListener('scroll', scheduleUpdate, { passive: true });
-				window.addEventListener('resize', scheduleUpdate, { passive: true });
-				document.addEventListener('astro:after-swap', scheduleUpdate);
+				}, { signal });
+				window.addEventListener('scroll', scheduleUpdate, { passive: true, signal });
+				window.addEventListener('resize', scheduleUpdate, { passive: true, signal });
+				document.addEventListener('astro:after-swap', scheduleUpdate, { signal });
 				update();
 			};
 
@@ -339,14 +340,26 @@ const tagCount = Object.keys(tagColors).length;
 			document.addEventListener('astro:before-swap', (event) => {
 				const currentRoute = document.querySelector<HTMLElement>('.route-panel');
 				const nextRoute = event.newDocument.querySelector<HTMLElement>('.route-panel');
-				if (!currentRoute || !nextRoute) return;
-				cacheCurrentRoute();
+				const currentPageShell = document.querySelector<HTMLElement>('[data-page-shell]');
+				const nextPageShell = event.newDocument.querySelector<HTMLElement>('[data-page-shell]');
+				if (!currentRoute || !nextRoute || !currentPageShell || !nextPageShell) return;
+				cacheCurrentRoute(event.from.href);
 				setRouteActive(currentRoute, false);
-				routeTitles.set(routeKey(event.newDocument.URL), event.newDocument.title);
+				routeTitles.set(routeKey(event.to.href), event.newDocument.title);
+
+				event.swap = () => {
+					const waterMode = document.documentElement.dataset.waterMode;
+					swapFunctions.deselectScripts(event.newDocument);
+					swapFunctions.swapRootAttributes(event.newDocument);
+					if (waterMode) document.documentElement.dataset.waterMode = waterMode;
+					swapFunctions.swapHeadElements(event.newDocument);
+					const restoreFocus = swapFunctions.saveFocus();
+					currentPageShell.replaceWith(nextPageShell);
+					restoreFocus();
+				};
 			});
 
 			document.addEventListener('astro:after-swap', () => {
-				cacheCurrentRoute();
 				ensureBackgroundVideoSource();
 				loadArticleMedia();
 				updateTagResults();

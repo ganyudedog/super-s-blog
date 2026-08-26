@@ -2,8 +2,6 @@
 
 ::view-transition-old(root),
 ::view-transition-new(root),
-::view-transition-group(background-video),
-::view-transition-group(water-scene),
 ::view-transition-group(site-top-bar),
 ::view-transition-group(site-personal-panel),
 ::view-transition-group(site-stats-panel),

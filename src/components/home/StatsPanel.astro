@@ -142,4 +142,5 @@ const configuredTags = Object.keys(tagColors);
   updateSelectedTag();
   document.addEventListener('astro:page-load', updateRunningDays);
   document.addEventListener('astro:page-load', updateSelectedTag);
+  document.addEventListener('route:activated', updateSelectedTag);
 </script>
