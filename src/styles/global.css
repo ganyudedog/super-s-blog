@@ -93,7 +93,7 @@ button {
 
 .background-video-layer {
   clip-path: inset(100% 0 0 0);
-  background: #050911 url('/background/WUWA-poster.jpg') 54% 50% / cover no-repeat;
+  background: #050911;
   will-change: clip-path, opacity;
 }
 
@@ -101,12 +101,23 @@ button {
   clip-path: inset(0);
 }
 
+.background-poster,
 .background-video {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
   object-position: 54% 50%;
+}
+
+.background-poster {
+  position: absolute;
+  inset: 0;
+}
+
+.background-video {
+  position: relative;
+  z-index: 1;
   opacity: 0;
   transition: opacity 240ms ease;
 }
@@ -118,6 +129,7 @@ button {
 .background-video-grade {
   position: absolute;
   inset: 0;
+  z-index: 2;
   background:
     linear-gradient(180deg, rgba(1, 4, 10, 0.34), rgba(2, 10, 19, 0.2) 52%, rgba(1, 4, 10, 0.42)),
     linear-gradient(90deg, rgba(1, 5, 12, 0.2), transparent 45%, rgba(1, 4, 10, 0.25));

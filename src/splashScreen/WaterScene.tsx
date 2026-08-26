@@ -304,13 +304,29 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     );
     fallbackVideoTexture.needsUpdate = true;
     fallbackVideoTexture.colorSpace = THREE.SRGBColorSpace;
+    const posterImage = document.querySelector<HTMLImageElement>('[data-background-poster]');
     let posterTextureReady = false;
-    const posterTexture = new THREE.TextureLoader().load(
-      '/background/WUWA-poster.jpg',
-      () => { posterTextureReady = true; },
-      undefined,
-      () => { posterTextureReady = false; },
-    );
+    const posterTexture = posterImage
+      ? new THREE.Texture(posterImage)
+      : new THREE.TextureLoader().load(
+        '/background/WUWA-poster.jpg',
+        () => { posterTextureReady = true; },
+        undefined,
+        () => { posterTextureReady = false; },
+      );
+    const handlePosterReady = () => {
+      if (!posterImage?.naturalWidth) return;
+      posterTexture.needsUpdate = true;
+      posterTextureReady = true;
+      host.dataset.posterTextureReady = 'true';
+      performance.mark('water-poster-texture-ready');
+    };
+    const handlePosterError = () => { posterTextureReady = false; };
+    if (posterImage) {
+      posterImage.addEventListener('load', handlePosterReady);
+      posterImage.addEventListener('error', handlePosterError);
+      if (posterImage.complete) handlePosterReady();
+    }
     posterTexture.colorSpace = THREE.SRGBColorSpace;
     posterTexture.minFilter = THREE.LinearFilter;
     posterTexture.magFilter = THREE.LinearFilter;
@@ -2127,6 +2143,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       backgroundVideo?.removeEventListener('loadedmetadata', syncVideoCover);
       backgroundVideo?.removeEventListener('playing', handleVideoPlaying);
       backgroundVideo?.removeEventListener('waiting', handleVideoWaiting);
+      posterImage?.removeEventListener('load', handlePosterReady);
+      posterImage?.removeEventListener('error', handlePosterError);
       window.removeEventListener('water:intro-skip', handleIntroSkip);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       heightTarget.dispose();

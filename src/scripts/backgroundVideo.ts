@@ -1,4 +1,4 @@
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 
 const HLS_MIME = 'application/vnd.apple.mpegurl';
 const START_BUFFER_SECONDS = 6;
@@ -6,6 +6,12 @@ const controllers = new WeakMap<HTMLVideoElement, Hls | null>();
 const listenerControllers = new WeakMap<HTMLVideoElement, AbortController>();
 const upgradeControllers = new WeakMap<HTMLVideoElement, AbortController>();
 const originalObjectUrls = new WeakMap<HTMLVideoElement, string>();
+let hlsModulePromise: Promise<typeof Hls> | null = null;
+
+function loadHlsModule() {
+  hlsModulePromise ??= import('hls.js').then(({ default: HlsConstructor }) => HlsConstructor);
+  return hlsModulePromise;
+}
 
 function bufferedAhead(video: HTMLVideoElement) {
   const position = video.currentTime;
@@ -171,16 +177,37 @@ function scheduleOriginalUpgrade(video: HTMLVideoElement, source: string) {
   if (!lifetime) return;
 
   const beginUpgrade = () => {
-    if (upgradeControllers.has(video)) return;
+    const existingController = upgradeControllers.get(video);
+    if (existingController && !existingController.signal.aborted) return;
+    if (existingController?.signal.aborted) upgradeControllers.delete(video);
+    if (document.documentElement.hasAttribute('data-foreground-audio-active')) {
+      video.dataset.originalUpgrade = 'deferred';
+      return;
+    }
     const controller = new AbortController();
     upgradeControllers.set(video, controller);
     lifetime.signal.addEventListener('abort', () => controller.abort(), { once: true });
-    void upgradeToOriginalVideo(video, source, controller.signal);
+    void upgradeToOriginalVideo(video, source, controller.signal).finally(() => {
+      if (upgradeControllers.get(video) === controller) upgradeControllers.delete(video);
+      if (controller.signal.aborted && video.dataset.videoSource !== 'original') {
+        video.dataset.originalUpgrade = 'deferred';
+      }
+    });
+  };
+
+  const handleForegroundAudioState = (event: Event) => {
+    const active = Boolean((event as CustomEvent<{ active?: boolean }>).detail?.active);
+    if (active) {
+      if (video.dataset.originalUpgrade === 'downloading') upgradeControllers.get(video)?.abort();
+      return;
+    }
+    if (video.dataset.videoSource !== 'original') beginUpgrade();
   };
 
   video.dataset.videoSource = 'hls';
   video.dataset.originalUpgrade = 'waiting';
   video.addEventListener('playing', beginUpgrade, { once: true, signal: lifetime.signal });
+  window.addEventListener('foreground-audio-state', handleForegroundAudioState, { signal: lifetime.signal });
 }
 
 function fallbackToProgressive(video: HTMLVideoElement, source: string) {
@@ -189,6 +216,52 @@ function fallbackToProgressive(video: HTMLVideoElement, source: string) {
   video.removeAttribute('src');
   video.src = source;
   video.load();
+}
+
+async function attachHls(video: HTMLVideoElement, playlist: string, progressive: string) {
+  let HlsConstructor: typeof Hls;
+  try {
+    HlsConstructor = await loadHlsModule();
+  } catch (error) {
+    console.warn('[BackgroundVideo] HLS module failed to load; using the original video.', error);
+    fallbackToProgressive(video, progressive);
+    controllers.set(video, null);
+    return;
+  }
+  if (video.dataset.backgroundController !== 'ready') return;
+  if (!HlsConstructor.isSupported()) {
+    fallbackToProgressive(video, progressive);
+    controllers.set(video, null);
+    return;
+  }
+
+  const hls = new HlsConstructor({
+    enableWorker: true,
+    lowLatencyMode: false,
+    backBufferLength: 30,
+    maxBufferLength: 30,
+    maxMaxBufferLength: 60,
+    maxBufferSize: 12 * 1000 * 1000,
+  });
+  controllers.set(video, hls);
+  scheduleOriginalUpgrade(video, progressive);
+  hls.on(HlsConstructor.Events.MEDIA_ATTACHED, () => hls.loadSource(playlist));
+  hls.on(HlsConstructor.Events.MANIFEST_PARSED, () => playWhenBuffered(video));
+  hls.on(HlsConstructor.Events.FRAG_BUFFERED, () => playWhenBuffered(video));
+  hls.on(HlsConstructor.Events.ERROR, (_event, data) => {
+    if (!data.fatal) return;
+    if (data.type === HlsConstructor.ErrorTypes.NETWORK_ERROR) {
+      hls.startLoad();
+      return;
+    }
+    if (data.type === HlsConstructor.ErrorTypes.MEDIA_ERROR) {
+      hls.recoverMediaError();
+      return;
+    }
+    hls.destroy();
+    fallbackToProgressive(video, progressive);
+  });
+  hls.attachMedia(video);
 }
 
 export function initBackgroundVideo(video: HTMLVideoElement) {
@@ -213,39 +286,7 @@ export function initBackgroundVideo(video: HTMLVideoElement) {
     return;
   }
 
-  if (!Hls.isSupported()) {
-    fallbackToProgressive(video, progressive);
-    controllers.set(video, null);
-    return;
-  }
-
-  const hls = new Hls({
-    enableWorker: true,
-    lowLatencyMode: false,
-    backBufferLength: 30,
-    maxBufferLength: 30,
-    maxMaxBufferLength: 60,
-    maxBufferSize: 12 * 1000 * 1000,
-  });
-  controllers.set(video, hls);
-  scheduleOriginalUpgrade(video, progressive);
-  hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(playlist));
-  hls.on(Hls.Events.MANIFEST_PARSED, () => playWhenBuffered(video));
-  hls.on(Hls.Events.FRAG_BUFFERED, () => playWhenBuffered(video));
-  hls.on(Hls.Events.ERROR, (_event, data) => {
-    if (!data.fatal) return;
-    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-      hls.startLoad();
-      return;
-    }
-    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-      hls.recoverMediaError();
-      return;
-    }
-    hls.destroy();
-    fallbackToProgressive(video, progressive);
-  });
-  hls.attachMedia(video);
+  void attachHls(video, playlist, progressive);
 }
 
 export function disposeBackgroundVideo(video: HTMLVideoElement) {

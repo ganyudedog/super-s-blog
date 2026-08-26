@@ -129,7 +129,15 @@ void main() {
   ) * 0.0014;
   vec2 refractedUv = clamp(videoUv + videoDistortion, vec2(0.002), vec2(0.998));
   vec2 blurDirection = normalize(vec2(0.72, 0.34) + normalMap.xz * 0.05) * 0.0018;
-  vec3 previewColor = texture(uPreviewTexture, refractedUv).rgb;
+  vec3 previewColor = texture(uPreviewTexture, refractedUv).rgb * 0.58;
+  previewColor += texture(
+    uPreviewTexture,
+    clamp(refractedUv + blurDirection, vec2(0.002), vec2(0.998))
+  ).rgb * 0.21;
+  previewColor += texture(
+    uPreviewTexture,
+    clamp(refractedUv - blurDirection, vec2(0.002), vec2(0.998))
+  ).rgb * 0.21;
   vec3 videoColor = texture(uVideoTexture, refractedUv).rgb * 0.58;
   videoColor += texture(
     uVideoTexture,
@@ -139,7 +147,11 @@ void main() {
     uVideoTexture,
     clamp(refractedUv - blurDirection, vec2(0.002), vec2(0.998))
   ).rgb * 0.21;
-  videoColor = mix(previewColor, videoColor, uVideoBlend);
+  videoColor = mix(
+    previewColor,
+    videoColor,
+    smoothstep(0.0, 1.0, uVideoBlend)
+  );
   float videoLuma = dot(videoColor, vec3(0.2126, 0.7152, 0.0722));
   vec3 desaturatedVideo = mix(vec3(videoLuma), videoColor, 0.82);
   vec3 submergedVideo = desaturatedVideo * vec3(0.72, 0.94, 1.08);

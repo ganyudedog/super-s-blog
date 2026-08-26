@@ -31,6 +31,13 @@ const tagCount = Object.keys(tagColors).length;
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" href="/image/favicon.ico" />
+		<link
+			rel="preload"
+			as="image"
+			type="image/jpeg"
+			href="/background/WUWA-poster.jpg"
+			fetchpriority="high"
+		/>
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
 		<meta name="theme-color" content="#050911" />
@@ -94,6 +101,7 @@ const tagCount = Object.keys(tagColors).length;
 		<script>
 			import { gsap } from 'gsap';
 			import { navigate, swapFunctions } from 'astro:transitions/client';
+			import { activateArticleAudio, deactivateArticleAudio } from '../scripts/articleAudio';
 			import { initBackgroundVideo } from '../scripts/backgroundVideo';
 
 			interface CachedPage {
@@ -161,8 +169,10 @@ const tagCount = Object.keys(tagColors).length;
 			const setPageActive = (shell: HTMLElement, active: boolean) => {
 				shell.inert = !active;
 				shell.dataset.pageState = active ? 'active' : 'inactive';
-				if (!active) {
-					shell.querySelectorAll<HTMLMediaElement>('audio, video').forEach((media) => media.pause());
+				if (active) activateArticleAudio(shell);
+				else {
+					deactivateArticleAudio(shell);
+					shell.querySelectorAll<HTMLVideoElement>('video').forEach((media) => media.pause());
 				}
 			};
 
@@ -232,11 +242,7 @@ const tagCount = Object.keys(tagColors).length;
 			};
 
 			const loadArticleMedia = () => {
-				document.querySelectorAll<HTMLAudioElement>('.article-prose audio').forEach((audio) => {
-					if (audio.dataset.routeMediaLoaded === 'true') return;
-					audio.dataset.routeMediaLoaded = 'true';
-					if (audio.preload === '') audio.preload = 'metadata';
-				});
+				activateArticleAudio(document);
 			};
 
 			const updateTagResults = () => {

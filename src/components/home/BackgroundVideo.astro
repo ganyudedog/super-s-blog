@@ -15,6 +15,14 @@ const { revealed = false } = Astro.props;
   data-static-background={revealed || undefined}
   aria-hidden="true"
 >
+	<img
+		class="background-poster"
+		src="/background/WUWA-poster.jpg"
+		alt=""
+		fetchpriority="high"
+		decoding="sync"
+		data-background-poster
+	/>
   <video
     id="background-video"
     class="background-video"
@@ -22,7 +30,6 @@ const { revealed = false } = Astro.props;
     loop
     playsinline
     preload="auto"
-    poster="/background/WUWA-poster.jpg"
     disablepictureinpicture
     controlslist="nodownload noplaybackrate nofullscreen"
     tabindex="-1"
