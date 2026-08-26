@@ -18,17 +18,16 @@ const { revealed = false } = Astro.props;
   <video
     id="background-video"
     class="background-video"
-    autoplay
     muted
     loop
     playsinline
-    preload="metadata"
+    preload="auto"
     poster="/background/WUWA-poster.jpg"
     disablepictureinpicture
     controlslist="nodownload noplaybackrate nofullscreen"
     tabindex="-1"
-    data-hls-desktop="/background/hls/desktop/master.m3u8"
-    data-hls-mobile="/background/hls/mobile/master.m3u8"
+    data-hls-desktop="/background/hls/desktop/480p/index.m3u8"
+    data-hls-mobile="/background/hls/mobile/360p/index.m3u8"
     data-video-desktop="/media/background/WUWA-desktop.mp4"
     data-video-mobile="/media/background/WUWA-mobile.mp4"
   >

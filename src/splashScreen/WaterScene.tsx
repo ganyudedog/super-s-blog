@@ -1368,18 +1368,29 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
     };
     window.addEventListener('water:intro-skip', handleIntroSkip);
     let hasDecodedVideoFrame = false;
-    let videoBlendStartedAt = -1;
+    let videoBlendValue = 0;
+    let videoBlendTarget = 0;
+    const handleVideoPlaying = () => {
+      hasDecodedVideoFrame = true;
+      videoBlendTarget = 1;
+    };
+    const handleVideoWaiting = () => {
+      videoBlendTarget = 0;
+    };
     const supportsVideoFrameCallback = Boolean(
       backgroundVideo && typeof backgroundVideo.requestVideoFrameCallback === 'function',
     );
     if (backgroundVideo && supportsVideoFrameCallback) {
       backgroundVideo.requestVideoFrameCallback(() => {
         hasDecodedVideoFrame = true;
+        if (!backgroundVideo.paused) videoBlendTarget = 1;
       });
     }
     if (backgroundVideo && !supportsVideoFrameCallback && backgroundVideo.readyState >= 2) {
       hasDecodedVideoFrame = true;
     }
+    backgroundVideo?.addEventListener('playing', handleVideoPlaying);
+    backgroundVideo?.addEventListener('waiting', handleVideoWaiting);
     let pointerRippleIndex = 0;
     let lastPointerRippleAt = -Infinity;
     let lastPointerX = Number.NaN;
@@ -1530,6 +1541,7 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       animationFrame = requestAnimationFrame(render);
       const now = performance.now() / 1000;
       if (now - lastRenderedAt < 1 / 30 - 0.001) return;
+      const frameDelta = lastRenderedAt === 0 ? 1 / 30 : now - lastRenderedAt;
       lastRenderedAt = now;
       const elapsed = rebaseTimeline(now - startedAt);
       const introElapsed = now - introStartedAt;
@@ -1543,12 +1555,14 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       if (backgroundVideo && !supportsVideoFrameCallback && backgroundVideo.readyState >= 2) {
         hasDecodedVideoFrame = true;
       }
-      if (hasDecodedVideoFrame && videoBlendStartedAt < 0) videoBlendStartedAt = now;
-      const videoBlend = videoBlendStartedAt < 0
-        ? 0
-        : Math.min(1, Math.max(0, (now - videoBlendStartedAt) / 0.36));
+      videoBlendValue = THREE.MathUtils.damp(
+        videoBlendValue,
+        videoBlendTarget,
+        videoBlendTarget > videoBlendValue ? 8 : 16,
+        frameDelta,
+      );
       waterUniforms.uVideoReady.value = posterTextureReady || hasDecodedVideoFrame ? 1 : 0;
-      waterUniforms.uVideoBlend.value = videoBlend;
+      waterUniforms.uVideoBlend.value = videoBlendValue;
 
       pointerSprayStates.forEach((particle, index) => {
         const age = elapsed - particle.bornAt;
@@ -2111,6 +2125,8 @@ export default function WaterScene({ onComplete, intro = false }: WaterSceneProp
       }
       resizeObserver.disconnect();
       backgroundVideo?.removeEventListener('loadedmetadata', syncVideoCover);
+      backgroundVideo?.removeEventListener('playing', handleVideoPlaying);
+      backgroundVideo?.removeEventListener('waiting', handleVideoWaiting);
       window.removeEventListener('water:intro-skip', handleIntroSkip);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       heightTarget.dispose();

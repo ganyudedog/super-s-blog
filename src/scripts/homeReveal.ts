@@ -94,7 +94,6 @@ export function initHomeReveal() {
     video.defaultMuted = true;
     video.loop = true;
     video.controls = false;
-    void video.play().catch(() => undefined);
     video.addEventListener('error', () => stage.classList.add('has-video-error'));
   }
 
@@ -132,7 +131,6 @@ export function initHomeReveal() {
     revealed = true;
     stage.dataset.revealState = 'waiting-video';
     if (video) {
-      void video.play().catch(() => undefined);
       const mobile = window.matchMedia('(max-width: 767px)').matches;
       void waitForDecodedVideoFrame(video, mobile ? 1600 : 2400).then((videoFrameReady) => {
         stage.dataset.videoFrameReady = String(videoFrameReady);

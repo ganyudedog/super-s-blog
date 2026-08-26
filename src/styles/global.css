@@ -93,7 +93,7 @@ button {
 
 .background-video-layer {
   clip-path: inset(100% 0 0 0);
-  background: transparent;
+  background: #050911 url('/background/WUWA-poster.jpg') 54% 50% / cover no-repeat;
   will-change: clip-path, opacity;
 }
 
@@ -107,6 +107,12 @@ button {
   display: block;
   object-fit: cover;
   object-position: 54% 50%;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.background-video-layer[data-video-state='playing'] .background-video {
+  opacity: 1;
 }
 
 .background-video-grade {
