@@ -68,9 +68,16 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
       });
     }
     if (nextProfile.pointerWater) {
-      void import('./PointerWaterLayer').then(({ default: component }) => {
-        if (!cancelled) setPointerWaterLayer(() => component);
-      });
+      const loadPointerLayer = () => {
+        void import('./PointerWaterLayer').then(({ default: component }) => {
+          if (!cancelled) setPointerWaterLayer(() => component);
+        });
+      };
+      if (nextProfile.mainWater) {
+        window.addEventListener('water:ready', loadPointerLayer, { once: true });
+      } else {
+        loadPointerLayer();
+      }
     }
 
     if (nextProfile.mode === 'compatibility') skipIntroWithoutNavigation();
@@ -108,6 +115,10 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
   if (!profile.mainWater) {
     return profile.pointerWater && PointerWaterLayer ? <PointerWaterLayer /> : null;
   }
+
+  // Keep the lightweight boot canvas visible until the full scene module has
+  // arrived. Rendering the stage earlier would cover it with a blank backdrop.
+  if (!WaterScene) return null;
 
   return (
     <div className="water-stage">

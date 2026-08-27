@@ -8,6 +8,7 @@ import StatsPanel from '../components/home/StatsPanel.astro';
 import TopBar from '../components/home/TopBar.astro';
 import { siteConfig, tagColors } from '../config';
 import SplashScreen from '../splashScreen/SplashScreen';
+import WaterBoot from '../splashScreen/WaterBoot.astro';
 
 interface Props {
 	title?: string;
@@ -67,6 +68,7 @@ const tagCount = Object.keys(tagColors).length;
 			)}
 			<div data-webgl-shell>
 				<BackgroundVideo revealed={!intro} />
+				<WaterBoot />
 				{intro
 					? <SplashScreen intro={intro} client:load />
 					: <SplashScreen intro={intro} client:idle={{ timeout: 1500 }} />}
@@ -125,6 +127,7 @@ const tagCount = Object.keys(tagColors).length;
 			let swappedNavigationKey: string | null = null;
 			let scrollChromeAbort: AbortController | null = null;
 			let scrollChromeButton: HTMLButtonElement | null = null;
+			let backgroundVideoStartTimer = 0;
 			const NAVIGATION_WATCHDOG_MS = 30000;
 
 			const routeKey = (url = window.location.href) => {
@@ -212,6 +215,16 @@ const tagCount = Object.keys(tagColors).length;
 			const ensureBackgroundVideoSource = () => {
 				const video = document.querySelector<HTMLVideoElement>('#background-video');
 				if (!video) return;
+				if (video.dataset.backgroundController === 'ready') return;
+				if (document.querySelector('[data-water-boot]')) {
+					if (backgroundVideoStartTimer !== 0) return;
+					backgroundVideoStartTimer = window.setTimeout(() => {
+						backgroundVideoStartTimer = 0;
+						const currentVideo = document.querySelector<HTMLVideoElement>('#background-video');
+						if (currentVideo?.isConnected) initBackgroundVideo(currentVideo);
+					}, 1800);
+					return;
+				}
 				initBackgroundVideo(video);
 			};
 
@@ -244,6 +257,13 @@ const tagCount = Object.keys(tagColors).length;
 
 			const loadArticleMedia = () => {
 				activateArticleAudio(document);
+			};
+
+			// Start only the main scene early. Pointer simulation is loaded after the
+			// first complete water frame so it cannot compete with the first paint.
+			const preloadWaterModules = () => {
+				if (!document.querySelector('[data-webgl-shell]')) return;
+				void import('../splashScreen/WaterScene');
 			};
 
 			const updateTagResults = () => {
@@ -354,6 +374,7 @@ const tagCount = Object.keys(tagColors).length;
 			updateTagResults();
 			ensureBackgroundVideoSource();
 			bindRouteCache();
+			preloadWaterModules();
 
 			document.addEventListener('astro:before-preparation', (event) => {
 				const targetKey = routeKey(event.to.href);
