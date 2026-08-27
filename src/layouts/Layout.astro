@@ -1,5 +1,5 @@
 ---
-import '../styles/global.css';
+import globalCss from '../styles/global.css?inline';
 import { getCollection } from 'astro:content';
 import { ClientRouter } from 'astro:transitions';
 import BackgroundVideo from '../components/home/BackgroundVideo.astro';
@@ -52,6 +52,7 @@ const tagCount = Object.keys(tagColors).length;
 				background: linear-gradient(180deg, #071827 0%, #071421 52%, #040a12 100%);
 			}
 		</style>
+		<style is:inline set:html={globalCss}></style>
 		<title>{ `${title} | ${description}` }</title>
 		<ClientRouter fallback="swap" />
 	</head>

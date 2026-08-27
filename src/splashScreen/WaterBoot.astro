@@ -11,6 +11,25 @@
 		if (!(canvas instanceof HTMLCanvasElement)) return;
 		if (canvas.dataset.waterBootInitialized === 'true') return;
 		canvas.dataset.waterBootInitialized = 'true';
+		let rootRevealQueued = false;
+		const publishRootReveal = () => {
+			const stage = document.querySelector('[data-home-stage]');
+			if (stage?.getAttribute('data-reveal-state') !== 'waiting' || rootRevealQueued) return;
+			rootRevealQueued = true;
+			stage.dataset.waterIntroSkipped = 'true';
+			const publish = () => {
+				window.dispatchEvent(new CustomEvent('water:first-frame'));
+				window.dispatchEvent(new CustomEvent('water:intro-skip'));
+				window.dispatchEvent(new CustomEvent('water:reveal', {
+					detail: { impactAge: 1.18, light: { x: 0, y: 0 } },
+				}));
+			};
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', publish, { once: true });
+			} else {
+				publish();
+			}
+		};
 
 		const gl = canvas.getContext('webgl2', {
 			alpha: true,
@@ -22,6 +41,8 @@
 		});
 		if (!gl) {
 			canvas.classList.add('is-fallback');
+			canvas.dataset.firstFrame = 'true';
+			publishRootReveal();
 			return;
 		}
 
@@ -109,6 +130,7 @@ void main() {
 		let pointerY = 0.5;
 		let frame = 0;
 		let disposed = false;
+		let bootFramePublished = false;
 
 		const uploadPoster = () => {
 			if (!(poster instanceof HTMLImageElement) || !poster.naturalWidth) return;
@@ -144,6 +166,12 @@ void main() {
 			if (resolution) gl.uniform2f(resolution, canvas.width, canvas.height);
 			if (pointer) gl.uniform2f(pointer, pointerX, pointerY);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
+			if (!bootFramePublished) {
+				bootFramePublished = true;
+				canvas.dataset.firstFrame = 'true';
+				performance.mark('water-boot-first-frame');
+				publishRootReveal();
+			}
 			frame = window.requestAnimationFrame(render);
 		};
 		const move = (event) => {

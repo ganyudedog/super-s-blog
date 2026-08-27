@@ -150,7 +150,8 @@ button {
 .water-boot-canvas {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  /* Above the intro cover, below page content and navigation. */
+  z-index: 12;
   display: block;
   width: 100%;
   height: 100%;
