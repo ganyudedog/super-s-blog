@@ -69,7 +69,7 @@ const tagCount = Object.keys(tagColors).length;
 			)}
 			<div data-webgl-shell>
 				<BackgroundVideo revealed={!intro} />
-				<WaterBoot />
+				<WaterBoot intro={intro} />
 				{intro
 					? <SplashScreen intro={intro} client:load />
 					: <SplashScreen intro={intro} client:idle={{ timeout: 1500 }} />}

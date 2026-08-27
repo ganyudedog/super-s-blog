@@ -165,6 +165,10 @@ button {
   opacity: 0;
 }
 
+.water-boot-canvas.is-intro {
+  z-index: 9;
+}
+
 .water-boot-canvas.is-fallback {
   background:
     linear-gradient(180deg, rgba(7, 24, 39, 0.25), rgba(4, 10, 18, 0.45)),

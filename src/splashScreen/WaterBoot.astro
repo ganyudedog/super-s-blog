@@ -1,5 +1,13 @@
+---
+interface Props {
+	intro?: boolean;
+}
+
+const { intro = false } = Astro.props;
+---
+
 <canvas
-	class="water-boot-canvas"
+	class:list={['water-boot-canvas', intro && 'is-intro']}
 	data-water-boot
 	aria-hidden="true"
 ></canvas>
@@ -11,10 +19,17 @@
 		if (!(canvas instanceof HTMLCanvasElement)) return;
 		if (canvas.dataset.waterBootInitialized === 'true') return;
 		canvas.dataset.waterBootInitialized = 'true';
+		const isIntroPath = window.location.pathname === '/';
 		let rootRevealQueued = false;
 		const publishRootReveal = () => {
 			const stage = document.querySelector('[data-home-stage]');
-			if (stage?.getAttribute('data-reveal-state') !== 'waiting' || rootRevealQueued) return;
+			// The root path has a deliberate intro timeline. Only static /index/
+			// renders may be unlocked by the lightweight boot frame.
+			if (
+				window.location.pathname === '/'
+				|| stage?.getAttribute('data-reveal-state') !== 'waiting'
+				|| rootRevealQueued
+			) return;
 			rootRevealQueued = true;
 			stage.dataset.waterIntroSkipped = 'true';
 			const publish = () => {
@@ -41,8 +56,10 @@
 		});
 		if (!gl) {
 			canvas.classList.add('is-fallback');
-			canvas.dataset.firstFrame = 'true';
-			publishRootReveal();
+			if (!isIntroPath) {
+				canvas.dataset.firstFrame = 'true';
+				publishRootReveal();
+			}
 			return;
 		}
 
@@ -168,9 +185,11 @@ void main() {
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
 			if (!bootFramePublished) {
 				bootFramePublished = true;
-				canvas.dataset.firstFrame = 'true';
-				performance.mark('water-boot-first-frame');
-				publishRootReveal();
+				if (!isIntroPath) {
+					canvas.dataset.firstFrame = 'true';
+					performance.mark('water-boot-first-frame');
+					publishRootReveal();
+				}
 			}
 			frame = window.requestAnimationFrame(render);
 		};
