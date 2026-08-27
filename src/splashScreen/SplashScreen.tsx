@@ -1,11 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import {
   detectWaterCompatibility,
   type WaterCompatibilityProfile,
 } from './waterCompatibility';
-
-import PointerWaterLayer from './PointerWaterLayer';
-import WaterScene from './WaterScene';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -15,6 +12,14 @@ interface SplashScreenProps {
 interface CompatibilityFallbackDetail {
   scope?: 'all' | 'pointer';
 }
+
+interface WaterSceneProps {
+  onComplete?: () => void;
+  intro?: boolean;
+}
+
+type WaterSceneComponent = ComponentType<WaterSceneProps>;
+type PointerWaterComponent = ComponentType;
 
 function exposeCompatibilityProfile(profile: WaterCompatibilityProfile) {
   const stage = document.querySelector<HTMLElement>('[data-home-stage]');
@@ -30,6 +35,8 @@ function exposeCompatibilityProfile(profile: WaterCompatibilityProfile) {
 
 export default function SplashScreen({ onComplete, intro = false }: SplashScreenProps) {
   const [profile, setProfile] = useState<WaterCompatibilityProfile | null>(null);
+  const [WaterScene, setWaterScene] = useState<WaterSceneComponent | null>(null);
+  const [PointerWaterLayer, setPointerWaterLayer] = useState<PointerWaterComponent | null>(null);
 
   useEffect(() => {
     const skipIntroWithoutNavigation = () => {
@@ -53,6 +60,18 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
     }
     exposeCompatibilityProfile(nextProfile);
     setProfile(nextProfile);
+
+    let cancelled = false;
+    if (nextProfile.mainWater) {
+      void import('./WaterScene').then(({ default: component }) => {
+        if (!cancelled) setWaterScene(() => component);
+      });
+    }
+    if (nextProfile.pointerWater) {
+      void import('./PointerWaterLayer').then(({ default: component }) => {
+        if (!cancelled) setPointerWaterLayer(() => component);
+      });
+    }
 
     if (nextProfile.mode === 'compatibility') skipIntroWithoutNavigation();
 
@@ -79,6 +98,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
     };
     window.addEventListener('water:compatibility-fallback', handleRuntimeFallback);
     return () => {
+      cancelled = true;
       window.removeEventListener('water:compatibility-fallback', handleRuntimeFallback);
     };
   }, [intro]);
@@ -86,7 +106,7 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
   if (!profile) return null;
 
   if (!profile.mainWater) {
-    return profile.pointerWater ? <PointerWaterLayer /> : null;
+    return profile.pointerWater && PointerWaterLayer ? <PointerWaterLayer /> : null;
   }
 
   return (
@@ -96,8 +116,8 @@ export default function SplashScreen({ onComplete, intro = false }: SplashScreen
         data-water-night
         style={{ opacity: intro ? 1 : 0 }}
       />
-      <WaterScene intro={intro} onComplete={onComplete} />
-      {profile.pointerWater && <PointerWaterLayer />}
+      {WaterScene && <WaterScene intro={intro} onComplete={onComplete} />}
+      {profile.pointerWater && PointerWaterLayer && <PointerWaterLayer />}
     </div>
   );
 }

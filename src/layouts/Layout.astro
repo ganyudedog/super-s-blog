@@ -67,7 +67,9 @@ const tagCount = Object.keys(tagColors).length;
 			)}
 			<div data-webgl-shell>
 				<BackgroundVideo revealed={!intro} />
-				<SplashScreen intro={intro} client:load />
+				{intro
+					? <SplashScreen intro={intro} client:load />
+					: <SplashScreen intro={intro} client:idle={{ timeout: 1500 }} />}
 			</div>
 			<div data-page-shell>
 				<TopBar revealed={!intro} />
@@ -99,7 +101,6 @@ const tagCount = Object.keys(tagColors).length;
 			</div>
 		</div>
 		<script>
-			import { gsap } from 'gsap';
 			import { navigate, swapFunctions } from 'astro:transitions/client';
 			import { activateArticleAudio, deactivateArticleAudio } from '../scripts/articleAudio';
 			import { initBackgroundVideo } from '../scripts/backgroundVideo';
@@ -282,7 +283,7 @@ const tagCount = Object.keys(tagColors).length;
 
 				let frame = 0;
 				let topBarHidden = false;
-				let scrollTween: ReturnType<typeof gsap.to> | null = null;
+				let topBarAnimation: Animation | null = null;
 				const update = () => {
 					frame = 0;
 					const topBar = document.querySelector<HTMLElement>('.top-bar');
@@ -291,34 +292,34 @@ const tagCount = Object.keys(tagColors).length;
 					if (!topBar || shouldHide === topBarHidden) return;
 
 					topBarHidden = shouldHide;
-					gsap.killTweensOf(topBar);
+					topBarAnimation?.cancel();
 					if (shouldHide) {
 						topBar.classList.remove('is-menu-open');
 						document.documentElement.classList.remove('nav-drawer-open');
 						document.querySelector<HTMLElement>('[data-mobile-nav-drawer]')?.setAttribute('aria-hidden', 'true');
 						topBar.querySelector<HTMLButtonElement>('.nav-menu-button')?.setAttribute('aria-expanded', 'false');
 						button.dataset.visible = 'false';
-						gsap.to(topBar, {
-							yPercent: -125,
-							opacity: 0,
-							duration: 0.2,
-							ease: 'power2.in',
-							overwrite: true,
-							onStart: () => { topBar.style.pointerEvents = 'none'; },
-							onComplete: () => {
-								if (topBarHidden) button.dataset.visible = 'true';
-							},
-						});
+						topBar.style.pointerEvents = 'none';
+						topBarAnimation = topBar.animate(
+							[
+								{ transform: 'translateY(0)', opacity: 1 },
+								{ transform: 'translateY(-125%)', opacity: 0 },
+							],
+							{ duration: 200, easing: 'ease-in', fill: 'forwards' },
+						);
+						topBarAnimation.onfinish = () => {
+							if (topBarHidden) button.dataset.visible = 'true';
+						};
 					} else {
 						button.dataset.visible = 'false';
-						gsap.to(topBar, {
-							yPercent: 0,
-							opacity: 1,
-							duration: 0.4,
-							ease: 'power2.out',
-							overwrite: true,
-							onComplete: () => { topBar.style.pointerEvents = ''; },
-						});
+						topBarAnimation = topBar.animate(
+							[
+								{ transform: 'translateY(-125%)', opacity: 0 },
+								{ transform: 'translateY(0)', opacity: 1 },
+							],
+							{ duration: 400, easing: 'ease-out', fill: 'forwards' },
+						);
+						topBarAnimation.onfinish = () => { topBar.style.pointerEvents = ''; };
 					}
 				};
 
@@ -329,19 +330,8 @@ const tagCount = Object.keys(tagColors).length;
 
 				button.addEventListener('click', () => {
 					const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-					const scrollPosition = { y: window.scrollY };
-					scrollTween?.kill();
-					scrollTween = gsap.to(scrollPosition, {
-						y: 0,
-						duration: reduceMotion ? 0 : 0.2,
-						ease: 'power3.out',
-						overwrite: true,
-						onUpdate: () => window.scrollTo(0, scrollPosition.y),
-						onComplete: () => {
-							window.scrollTo(0, 0);
-							scheduleUpdate();
-						},
-					});
+					window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+					window.setTimeout(scheduleUpdate, reduceMotion ? 0 : 220);
 				}, { signal });
 				window.addEventListener('scroll', scheduleUpdate, { passive: true, signal });
 				window.addEventListener('resize', scheduleUpdate, { passive: true, signal });

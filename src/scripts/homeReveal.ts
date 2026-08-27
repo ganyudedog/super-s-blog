@@ -1,5 +1,3 @@
-import { gsap } from 'gsap';
-
 interface WaterRevealDetail {
   impactAge?: number;
   light?: { x: number; y: number };
@@ -100,20 +98,52 @@ export function initHomeReveal() {
   let revealed = false;
   let finished = false;
   let sceneFallback = 0;
+  const revealAnimations = new Set<Animation>();
+  const animateReveal = (
+    element: HTMLElement,
+    keyframes: Keyframe[],
+    options: KeyframeAnimationOptions,
+    onFinish?: () => void,
+  ) => {
+    const animation = element.animate(keyframes, { fill: 'both', ...options });
+    revealAnimations.add(animation);
+    animation.onfinish = () => {
+      revealAnimations.delete(animation);
+      onFinish?.();
+    };
+    return animation;
+  };
   const finishReveal = () => {
     if (finished) return;
     finished = true;
     window.clearTimeout(sceneFallback);
+    revealAnimations.forEach((animation) => animation.cancel());
+    revealAnimations.clear();
     hideBootSurface();
     const nightBackdrop = document.querySelector<HTMLElement>('[data-water-night]');
     if (background) {
-      gsap.set(background, { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1 });
+      background.style.clipPath = 'inset(0% 0% 0% 0%)';
+      background.style.opacity = '1';
     }
-    if (nightBackdrop) gsap.set(nightBackdrop, { opacity: 0 });
-    if (topBar) gsap.set(topBar, { yPercent: 0, opacity: 1 });
-    if (leftPanel) gsap.set(leftPanel, { x: 0, opacity: 1, filter: 'blur(0px)' });
-    if (rightPanel) gsap.set(rightPanel, { x: 0, opacity: 1, filter: 'blur(0px)' });
-    if (routePanel) gsap.set(routePanel, { x: 0, y: 0, scale: 1, opacity: 1 });
+    if (nightBackdrop) nightBackdrop.style.opacity = '0';
+    if (topBar) {
+      topBar.style.transform = 'translateY(0)';
+      topBar.style.opacity = '1';
+    }
+    if (leftPanel) {
+      leftPanel.style.transform = 'translateX(0)';
+      leftPanel.style.opacity = '1';
+      leftPanel.style.filter = 'blur(0px)';
+    }
+    if (rightPanel) {
+      rightPanel.style.transform = 'translateX(0)';
+      rightPanel.style.opacity = '1';
+      rightPanel.style.filter = 'blur(0px)';
+    }
+    if (routePanel) {
+      routePanel.style.transform = 'translate(0, 0) scale(1)';
+      routePanel.style.opacity = '1';
+    }
     stage.dataset.revealState = 'ready';
     stage.dataset.videoRevealState = 'ready';
     stage.dataset.routeRevealState = 'ready';
@@ -146,9 +176,15 @@ export function initHomeReveal() {
     const nightBackdrop = document.querySelector<HTMLElement>('[data-water-night]');
     const targets = [background, topBar, leftPanel, rightPanel, routePanel].filter(Boolean);
     if (reducedMotion) {
-      gsap.set(targets, { clearProps: 'transform,filter,clipPath', opacity: 1 });
-      if (background) gsap.set(background, { clipPath: 'inset(0% 0% 0% 0%)' });
-      if (nightBackdrop) gsap.set(nightBackdrop, { opacity: 0 });
+      targets.forEach((target) => {
+        if (!target) return;
+        target.style.removeProperty('transform');
+        target.style.removeProperty('filter');
+        target.style.removeProperty('clip-path');
+        target.style.opacity = '1';
+      });
+      if (background) background.style.clipPath = 'inset(0% 0% 0% 0%)';
+      if (nightBackdrop) nightBackdrop.style.opacity = '0';
       finishReveal();
       return;
     }
@@ -170,75 +206,70 @@ export function initHomeReveal() {
       )}px`;
     }
 
-    const timeline = gsap.timeline({ onComplete: finishReveal });
     if (background) {
-      timeline.fromTo(
+      animateReveal(
         background,
-        { clipPath: 'inset(100% 0% 0% 0%)', opacity: 0.4 },
-        {
-          clipPath: 'inset(0% 0% 0% 0%)',
-          opacity: 1,
-          duration: VIDEO_REVEAL_DURATION,
-          ease: 'power3.inOut',
-          onComplete: () => {
-            stage.dataset.videoRevealState = 'ready';
-          },
-        },
-        0,
+        [
+          { clipPath: 'inset(100% 0% 0% 0%)', opacity: 0.4 },
+          { clipPath: 'inset(0% 0% 0% 0%)', opacity: 1 },
+        ],
+        { duration: VIDEO_REVEAL_DURATION * 1000, easing: 'ease-in-out' },
+        () => { stage.dataset.videoRevealState = 'ready'; },
       );
     }
     if (nightBackdrop) {
-      timeline.to(nightBackdrop, { opacity: 0, duration: 1.1, ease: 'power2.inOut' }, 0);
+      animateReveal(
+        nightBackdrop,
+        [{ opacity: 1 }, { opacity: 0 }],
+        { duration: 1100, easing: 'ease-in-out' },
+      );
     }
     if (topBar) {
-      timeline.fromTo(
+      animateReveal(
         topBar,
-        { yPercent: -110, opacity: 0 },
-        { yPercent: 0, opacity: 1, duration: 0.68, ease: 'power3.out' },
-        TOP_BAR_REVEAL_AT,
+        [
+          { transform: 'translateY(-110%)', opacity: 0 },
+          { transform: 'translateY(0)', opacity: 1 },
+        ],
+        { duration: 680, delay: TOP_BAR_REVEAL_AT * 1000, easing: 'ease-out' },
       );
     }
     if (leftPanel) {
-      timeline.fromTo(
+      animateReveal(
         leftPanel,
-        { x: -64, opacity: 0, filter: 'blur(10px)' },
-        { x: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' },
-        SIDE_PANELS_REVEAL_AT,
+        [
+          { transform: 'translateX(-64px)', opacity: 0, filter: 'blur(10px)' },
+          { transform: 'translateX(0)', opacity: 1, filter: 'blur(0px)' },
+        ],
+        { duration: 700, delay: SIDE_PANELS_REVEAL_AT * 1000, easing: 'ease-out' },
       );
     }
     if (rightPanel) {
-      timeline.fromTo(
+      animateReveal(
         rightPanel,
-        { x: 64, opacity: 0, filter: 'blur(10px)' },
-        { x: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, ease: 'power3.out' },
-        SIDE_PANELS_REVEAL_AT,
+        [
+          { transform: 'translateX(64px)', opacity: 0, filter: 'blur(10px)' },
+          { transform: 'translateX(0)', opacity: 1, filter: 'blur(0px)' },
+        ],
+        { duration: 700, delay: SIDE_PANELS_REVEAL_AT * 1000, easing: 'ease-out' },
       );
     }
     if (routePanel) {
-      timeline.call(() => {
-        stage.dataset.routeRevealState = 'running';
-      }, [], ROUTE_PANEL_REVEAL_AT);
-      timeline.fromTo(
+      window.setTimeout(() => {
+        if (!finished) stage.dataset.routeRevealState = 'running';
+      }, ROUTE_PANEL_REVEAL_AT * 1000);
+      animateReveal(
         routePanel,
-        {
-          x: routeFromX,
-          y: routeFromY,
-          scale: 0.94,
-          opacity: 0,
-          transformOrigin: routeOrigin,
-        },
-        {
-          x: 0,
-          y: 0,
-          scale: 1,
-          opacity: 1,
-          duration: 0.82,
-          ease: 'power3.out',
-          onComplete: () => {
-            stage.dataset.routeRevealState = 'ready';
+        [
+          {
+            transform: `translate(${routeFromX}px, ${routeFromY}px) scale(0.94)`,
+            opacity: 0,
+            transformOrigin: routeOrigin,
           },
-        },
-        ROUTE_PANEL_REVEAL_AT,
+          { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        ],
+        { duration: 820, delay: ROUTE_PANEL_REVEAL_AT * 1000, easing: 'ease-out' },
+        () => { stage.dataset.routeRevealState = 'ready'; },
       );
     }
     window.setTimeout(finishReveal, 1800);
