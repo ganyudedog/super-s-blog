@@ -7,7 +7,7 @@ tags: [live2d,graphic]
 draft: false
 ---
 
-<audio src="/audio/tesa.m4a" preload="auto" loop controls>
+<audio src="/audio/tesa.m4a" preload="auto" loop controls autoplay>
   你的浏览器不支持音频播放。
 </audio>
 

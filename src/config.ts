@@ -38,6 +38,7 @@ export const tagColors = {
   work: 'border-rose-200/70 text-rose-100',
   rent: 'border-amber-200/70 text-amber-100',
   video: 'border-emerald-200/70 text-emerald-100',
+  optimize: 'border-lime-200/70 text-lime-100',
 } as const;
 
 export const defaultTagColor = 'border-slate-200/60 text-slate-100';
