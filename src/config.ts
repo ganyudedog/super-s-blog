@@ -39,6 +39,8 @@ export const tagColors = {
   rent: 'border-amber-200/70 text-amber-100',
   video: 'border-emerald-200/70 text-emerald-100',
   optimize: 'border-lime-200/70 text-lime-100',
+  method: 'border-teal-200/70 text-teal-100',
+  thought: 'border-violet-200/70 text-violet-100',
 } as const;
 
 export const defaultTagColor = 'border-slate-200/60 text-slate-100';
