@@ -41,6 +41,8 @@ export const tagColors = {
   optimize: 'border-lime-200/70 text-lime-100',
   method: 'border-teal-200/70 text-teal-100',
   thought: 'border-violet-200/70 text-violet-100',
+  worklet: 'border-zinc-200/70 text-zinc-100',
+  project: 'border-olive-200/70 text-olive-100',
 } as const;
 
 export const defaultTagColor = 'border-slate-200/60 text-slate-100';
