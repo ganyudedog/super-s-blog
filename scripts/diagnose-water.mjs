@@ -61,10 +61,11 @@ try {
     await page.waitForFunction(() => (
       document.querySelector('[data-water-scene-active="true"]')?.dataset.impact === 'true'
     ));
-    if (targetUrl.includes('waterDebug=hold-splash')) {
+    if (targetUrl.includes('waterDebug=hold-splash') || targetUrl.includes('waterDebugAge=')) {
       await page.waitForFunction(() => (
-        document.querySelector('[data-water-scene-active="true"]')?.dataset.enhancedSplashActive === 'true'
+        document.querySelector('[data-water-scene-active="true"]')?.dataset.splashActive === 'true'
       ), null, { timeout: 8000 });
+      await page.waitForTimeout(1200);
     } else {
       await page.waitForTimeout(850);
     }
